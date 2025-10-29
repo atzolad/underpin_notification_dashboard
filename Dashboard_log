@@ -1,0 +1,21 @@
+2025-10-28T16:59:17Z ERROR Error during login: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+2025-10-28T16:59:18Z ERROR Error during login: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+2025-10-28T17:01:01Z ERROR Error during login: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+2025-10-28T17:02:11Z ERROR Error during login: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+2025-10-28T17:02:12Z ERROR Error during login: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+2025-10-28T17:14:07Z INFO Reading customers from: underpin-notification-files
+2025-10-28T17:14:07Z INFO Reading products from: underpin-notification-files
+2025-10-28T17:14:07Z INFO Reading email_template from: underpin-notification-files
+2025-10-28T17:15:02Z INFO Reading customers from: underpin-notification-files
+2025-10-28T17:15:02Z INFO Saved file customers.json to GCS bucket:
+2025-10-28T17:15:02Z INFO New customer added: {'name': 'Alex', 'email': 'az@gmail.com', 'products': ['Another New Test Item']}
+2025-10-28T17:15:02Z INFO Reading customers from: underpin-notification-files
+2025-10-28T17:15:05Z INFO Reading customers from: underpin-notification-files
+2025-10-28T17:15:05Z INFO Saved file customers.json to GCS bucket:
+2025-10-28T17:15:05Z INFO Deleted customer: {'name': 'Alex', 'email': 'az@gmail.com', 'products': ['Another New Test Item']} at index: 4
+2025-10-28T17:15:05Z INFO Reading customers from: underpin-notification-files
+2025-10-28T17:29:50Z INFO Google User: {'sub': '100432041417406782136', 'name': 'Alex Z', 'given_name': 'Alex', 'family_name': 'Z', 'picture': 'https://lh3.googleusercontent.com/a/ACg8ocIszF03pwm1DM7I1gkFgRMnIcbiwt7HyEwscCE7iIlSg0j4EQ=s96-c', 'email': 'azoladswe@gmail.com', 'email_verified': True}
+2025-10-28T17:29:50Z INFO Logged in user: Alex Z
+2025-10-28T17:29:50Z INFO Reading customers from: underpin-notification-files
+2025-10-28T17:29:50Z INFO Reading products from: underpin-notification-files
+2025-10-28T17:29:50Z INFO Reading email_template from: underpin-notification-files
