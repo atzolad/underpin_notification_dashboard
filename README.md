@@ -1,7 +1,17 @@
 # UnderPin_Notification
 Notifications for UnderPin Vending
 
+This is the Admin dashboard to update the settings for the Underpin Notification Service.
 
+It is designed so that a non-technical user can adjust the settings used by the notification service without requiring code. 
+
+Can Add/Remove/Edit Customers and Products as well as edit the email template that the notifications are based on. 
+
+**NOTE** Due to the current limitations of the system response- the notification system is designed to identify customers by the products that they own. The product names in this app must match those from the machine and the product names in the machine must be unique. 
+
+Planned future functionality is to retrieve the list of products directly from the machine every day when this runs, to ensure that the product names match. 
+
+At the moment the Customer/Product list are stored as JSON files in leiu of a true Database for MVP. With a small customer/product list this was quick to implement and still responsive. Future plans are to update this to a true database. Possibly sql.lite. These files are stored in a google bucket named {gcp_project_name-files} - replace gcp_project_name with the actual gcp project name. 
 
 
 Deployment to Google Cloud:
@@ -13,7 +23,6 @@ gcloud artifacts repositories create cloud-run-source-deploy \
     --location=us-west2 \
     --description="Docker repository for Cloud Run images" \
     --project={project_name}
-
 
 To build a new image from the updated code:
 
@@ -28,8 +37,9 @@ gcloud run deploy {project_deployment_name} \
     --region us-west2 \
     --project {project_name}
 
+-------------------------------------------------------------------------------------  
 
-To update the environmental variables- they can be updated in the Google Cloud Console. Go to Cloud Run -> Edit and deploy new revision. On the default containers tab click variables and secrets and change the parameters.
+Need to add the environmental variables within the Google Cloud project. On the Cloud Console go to Cloud Run- click on the correct service. Click Edit and deploy new revision -> Variables and Secrets -> can add environmental variables there. Pasting the copied list from .env will populate them all.
 
 This is the command to download the configuration settings from the Google Cloud Console. 
 gcloud run services describe {project_name} \
@@ -57,40 +67,3 @@ To run locally:
 gcloud auth application-default login
 
 Before running the app.py Flask dashboard.
-
-FOR CRON JOB DEPLOYMENT
-
-# Build the image and tag it for your Google Cloud registry. F flag sets the specific file (since it is not just Dockerignore)
-docker build -f Dockerfile.cron -t gcr.io/{gcp-project_name}/{service_name}:latest .
-
-# Authenticate Docker to GCR (if you haven't already)
-gcloud auth configure-
-
-# Push the Docker Image
-docker push gcr.io/{gcp-project_name}/{service_name}:latest
-
-# Build for amd64/linux architecture and push in one command
-docker buildx build -f Dockerfile.cron --platform linux/amd64 -t gcr.io/{gcp-project_name}/{service_name}:latest --push .
-
-# Deploy the service
-gcloud run deploy {service_name} \
-    --image gcr.io/{gcp-project_name}/{service_name} :latest \
-    --platform managed \
-    --region us-west2 \
-    --no-allow-unauthenticated \
-    --max-instances 1 \
-    --port 8080 # Cloud Run requires a port, though this script won't use it
-
-# Create the scheduler job
-gcloud scheduler jobs create http {scheduler_job_name} \
-    --schedule="0 8 * * *" \
-    --uri="{service_url/}“ \
-    --http-method=POST \
-    --location=us-west2 \
-    --oidc-service-account-email="underpin-sales-notification@underpin-notification.iam.gserviceaccount.com" \
-    --oidc-token-audience="{service_url} no / at the end“
-    --time-zone="America/Los_Angeles" 
-
-# Immediately run to test
-
-    gcloud scheduler jobs run {scheduler_jobname} --location=us-west2
