@@ -3,6 +3,10 @@ Notifications for UnderPin Vending
 
 This is the Admin dashboard to update the settings for the Underpin Notification Service.
 
+The Dashboard is a FLASK APP backend which connects to a dashboard html template located in the templates directory. 
+
+The dashboard is secured using Google Oauth. Users will need to login to their google accounts to access. Because of the nature of Google Oauth, an additional allowed_users parameter exists in the env file to specify which google users have access. 
+
 It is designed so that a non-technical user can adjust the settings used by the notification service without requiring code. 
 
 Can Add/Remove/Edit Customers and Products as well as edit the email template that the notifications are based on. 
