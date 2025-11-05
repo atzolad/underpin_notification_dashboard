@@ -66,8 +66,14 @@ gsutil cp customers.json gs://[YOUR-CONFIG-BUCKET-NAME]/customers.json
 gsutil cp products.json gs://[YOUR-CONFIG-BUCKET-NAME]/products.json
 gsutil cp email-template.json gs://[YOUR-CONFIG-BUCKET-NAME]/email-template.json
 
+
+
+---------------------------------------------------------------------------
+
 To run locally:
 
 gcloud auth application-default login
 
 Before running the app.py Flask dashboard.
+
+Then run the Flask dashboard with python3 app.py and acesss at http://127.0.0.1:5000

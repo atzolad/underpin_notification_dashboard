@@ -19,3 +19,35 @@
 2025-10-28T17:29:50Z INFO Reading customers from: underpin-notification-files
 2025-10-28T17:29:50Z INFO Reading products from: underpin-notification-files
 2025-10-28T17:29:50Z INFO Reading email_template from: underpin-notification-files
+2025-10-28T23:19:00Z INFO Reading customers from: underpin-notification-files-test
+2025-10-28T23:19:00Z INFO Reading products from: underpin-notification-files-test
+2025-10-28T23:19:00Z INFO Reading email_template from: underpin-notification-files-test
+2025-10-28T23:19:01Z ERROR Error reading customers.json from GCS: 404 GET https://storage.googleapis.com/download/storage/v1/b/underpin-notification-files-test/o/customers.json?alt=media: The specified bucket does not exist.: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
+2025-10-28T23:19:01Z ERROR Error reading products.json from GCS: 404 GET https://storage.googleapis.com/download/storage/v1/b/underpin-notification-files-test/o/products.json?alt=media: The specified bucket does not exist.: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
+2025-10-28T23:19:01Z ERROR Error opening email template. Returning default
+2025-10-28T23:19:03Z INFO Reading customers from: underpin-notification-files-test
+2025-10-28T23:19:03Z INFO Reading products from: underpin-notification-files-test
+2025-10-28T23:19:03Z INFO Reading email_template from: underpin-notification-files-test
+2025-10-28T23:19:03Z ERROR Error reading products.json from GCS: 404 GET https://storage.googleapis.com/download/storage/v1/b/underpin-notification-files-test/o/products.json?alt=media: The specified bucket does not exist.: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
+2025-10-28T23:19:03Z ERROR Error reading customers.json from GCS: 404 GET https://storage.googleapis.com/download/storage/v1/b/underpin-notification-files-test/o/customers.json?alt=media: The specified bucket does not exist.: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
+2025-10-28T23:19:03Z ERROR Error opening email template. Returning default
+2025-10-28T23:19:21Z INFO Reading products from: underpin-notification-files-test
+2025-10-28T23:19:21Z ERROR Error reading products.json from GCS: 404 GET https://storage.googleapis.com/download/storage/v1/b/underpin-notification-files-test/o/products.json?alt=media: The specified bucket does not exist.: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
+2025-10-28T23:19:21Z INFO Reading products from: underpin-notification-files-test
+2025-10-28T23:19:21Z ERROR Error writing products.json to GCS bucket: 404 POST https://storage.googleapis.com/upload/storage/v1/b/underpin-notification-files-test/o?uploadType=multipart: {
+  "error": {
+    "code": 404,
+    "message": "The specified bucket does not exist.",
+    "errors": [
+      {
+        "message": "The specified bucket does not exist.",
+        "domain": "global",
+        "reason": "notFound"
+      }
+    ]
+  }
+}
+: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>)
+2025-10-28T23:19:21Z INFO Added Product: Product
+2025-10-28T23:19:21Z INFO Reading products from: underpin-notification-files-test
+2025-10-28T23:19:22Z ERROR Error reading products.json from GCS: 404 GET https://storage.googleapis.com/download/storage/v1/b/underpin-notification-files-test/o/products.json?alt=media: The specified bucket does not exist.: ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>, <HTTPStatus.PARTIAL_CONTENT: 206>)
