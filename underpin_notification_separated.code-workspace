@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../underpin_notification_service"
+		}
+	],
+	"settings": {}
+}
