@@ -302,7 +302,7 @@ def update_customer(idx):
                     400,
                 )
 
-    data["name"] = data["name"].strip()
+        data["name"] = data["name"].strip()
 
     if "email" in data:
         data["email"] = data["email"].strip()
