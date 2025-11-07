@@ -1,0 +1,32 @@
+steps:
+# 1. Build the Docker image
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'build'
+    - '-t'
+    - 'us-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/underpin-notifications-dashboard-image:$COMMIT_SHA'
+    - '.'
+
+# 2. Push the Docker image to Artifact Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'push'
+    - 'us-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/underpin-notifications-dashboard-image:$COMMIT_SHA'
+
+# 3. Deploy the Cloud Run Service (Update/Create)
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+    - 'run'
+    - 'deploy'
+    - '$_SERVICE_NAME'
+    - '--image'
+    # Use the newly built image tag
+    - 'us-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/underpin-notifications-dashboard-image:$COMMIT_SHA'
+    - '--region'
+    - '$_REGION' 
+
+images:
+- 'us-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/underpin-notifications-dashboard-image:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
