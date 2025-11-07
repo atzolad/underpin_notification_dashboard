@@ -18,7 +18,7 @@ from google.cloud import storage
 from dotenv import load_dotenv
 
 # Initialize Logging
-logger = setup_logging(__name__, log_file="Dashboard_log")
+logger = setup_logging(__name__)
 
 # Load environmental variables
 load_dotenv()
@@ -82,7 +82,6 @@ def google_login():
     try:
 
         redirect_uri = f"{BASE_URL}/google/auth/"
-        print(redirect_uri)
         return google.authorize_redirect(redirect_uri, prompt="select_account")
     except Exception as e:
         logger.error(f"Error during login: {str(e)}")
@@ -106,7 +105,6 @@ def google_auth():
         return render_template("unauthorized.html", email=user_email), 403
 
     # Store the user info in the session for later api endpoint checks.
-
     session["user"] = {
         "id": user["sub"],
         "name": user["name"],
@@ -135,7 +133,7 @@ def login_required(f):
     return decorated_function
 
 
-# Require API key- for endpoints or just use the Session cookie for a logged in user.
+# Require API key for endpoints or just use the Session cookie for a logged in user.
 def require_api_key_or_session(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -204,12 +202,6 @@ def save_customers(customers):
     except Exception as e:
         logger.error(f"Error writing {customer_file} to GCS bucket: {e}")
 
-    #   try:
-    #     with open (customer_file, "w") as cf:
-    #             json.dump(customers, cf,  indent=2)
-    #   except Exception as e:
-    #       logger.error(f"Error writing to customer file: {e}")
-
 
 # Get the customer list
 @app.route("/api/customers")
@@ -274,12 +266,6 @@ def update_customer(idx):
     """
     Put Method. Takes the index of the customer at the end of the url /<int:idx> and replaces the customer at that index with the payload in Json format:
 
-    updated_customer = {
-        "name": Newname,
-        "email": Newemail,
-        "products": New product 1, New product 2)
-    }
-
     """
 
     data = request.json
@@ -321,12 +307,6 @@ def delete_customer(idx):
     """
     Delete Method. Takes the index of the customer at the end of the url /<int:idx> and deletes that customer from the JSON file and saves it. Returns a 404 error if the customer is not found.
 
-    updated_customer = {
-        "name": Newname,
-        "email": Newemail,
-        "products": New product 1, New product 2)
-    }
-
     """
 
     customers = load_customers()
@@ -366,19 +346,6 @@ def load_products():
         logger.error(f"Error reading {product_file} from GCS: {e}")
         return []  # Return empty list or handle the error
 
-    # if os.path.exists(product_file):
-    #     try:
-
-    #         with open (product_file, "r") as pf:
-    #             data = json.load(pf)
-    #             return data
-
-    #     except Exception as e:
-    #         logger.error(f"Error opening customer file: {e}")
-    #         return f"Error opening customer file: {e}"
-
-    # return "OS Path doesn't exist"
-
 
 # Save the new product list
 def save_products(products):
@@ -400,12 +367,6 @@ def save_products(products):
 
     except Exception as e:
         logger.error(f"Error writing {product_file} to GCS bucket: {e}")
-
-    #   try:
-    #     with open (product_file, "w") as pf:
-    #             json.dump(products, pf,  indent=2)
-    #   except Exception as e:
-    #       logger.error(f"Error writing to customer file: {e}")
 
 
 # Get the product list
@@ -589,12 +550,6 @@ def save_email_template(updated_email_template):
     except Exception as e:
         logger.error(f"Error writing {email_template} to GCS bucket: {e}")
 
-    # try:
-    #     with open (email_template, "w") as et:
-    #             json.dump(updated_email_template, et,  indent=2)
-    # except Exception as e:
-    #     logger.error(f"Error writing to email_template: {e}")
-
 
 # Get the email template
 @app.route("/api/email-template")
@@ -614,19 +569,9 @@ def update_email_template():
     """
     POST method. Accepts the updated email template in JSON format:
 
-    {
-    "subject": "{customer_name} Daily Sales Report for {date}",
-    "greeting": "Dear {customer_name},",
-    "header": "Here's your sales summary for {date}:\n",
-    "sign_off": "Thank you,",
-    "signature": "The Underpin Team",
-    "total_revenue": "Your total revenue from yesterday's sales:"
-    }
-
     Saves it using the save_email_template function.
 
     Returns Success: True in JSON format
-
     """
 
     updated_email_template = request.json
