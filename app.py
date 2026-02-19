@@ -7,6 +7,7 @@ from flask import (
     url_for,
     session,
     g,
+    current_app,
 )
 import json
 import os
@@ -16,6 +17,11 @@ from logger import setup_logging
 from config import customer_file, product_file, email_template
 from google.cloud import storage
 from dotenv import load_dotenv
+import psycopg
+from psycopg_pool import ConnectionPool
+from psycopg.rows import dict_row
+import atexit
+
 
 # Initialize Logging
 logger = setup_logging(__name__)
@@ -25,6 +31,7 @@ load_dotenv()
 
 # Initialize Flask App Instance
 app = Flask(__name__)
+
 
 # Retrieve environmental variables
 app.secret_key = os.environ.get("SECRET_KEY")
@@ -36,6 +43,35 @@ ALLOWED_USERS = [
     for email in os.getenv("ALLOWED_USERS", "").split(",")
     if email.strip()
 ]
+
+# DB_PARAMETERS = {
+#     "host": os.environ.get("DB_HOST", "localhost"),
+#     "dbname": os.environ.get("DB_NAME", "postgres"),
+#     "user": os.environ.get("DB_USER", "postgres"),
+#     "min_size": 1,
+#     "max_size": 10,
+# }
+
+CONN_STR = os.environ.get("CONN_STR")
+if not CONN_STR:
+    logger.warniing(f"Connection String env variable not found")
+
+# Initialize the DB connection pool
+logger.info(f"Initializing the connection pool")
+
+try:
+    pool = ConnectionPool(conninfo=CONN_STR)
+    logger.info(f"Connection pool initialized")
+
+except Exception as e:
+    logger.warning(f"Error initializing connection pool: {e}")
+
+
+def get_db_pool():
+    if pool is None:
+        raise Exception("Database Pool not initialized")
+    return pool
+
 
 # Get base URL from environment
 BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
@@ -181,6 +217,24 @@ def load_customers():
         return []  # Return empty list or handle the error
 
 
+def db_get_customers():
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+            SELECT c.name, c.email, ARRAY_AGG (p.name ORDER BY p.name) AS products
+            FROM customers AS c
+            JOIN customer_products AS cp on c.id = cp.customer_id
+            JOIN products AS p on cp.product_id = p.id
+            GROUP BY c.name, c.email 
+                """
+            )
+            customer_rows = cur.fetchall()
+            return customer_rows
+
+
 def save_customers(customers):
     """
     Takes the new customer list in JSON format as input. Opens the customer file in "write" mode and writes the new list to the file.
@@ -206,15 +260,21 @@ def save_customers(customers):
 # Get the customer list
 @app.route("/api/customers")
 @require_api_key_or_session
+# def get_customers():
+#     """
+#     Uses the load_customers function to open the Customer JSON file and return the data as a python object.
+
+#     For the Dashboard- Displays the list of current customers on the customer page.
+
+
+#     """
+#     data = load_customers()
+#     return data
+
+
 def get_customers():
-    """
-    Uses the load_customers function to open the Customer JSON file and return the data as a python object.
-
-    For the Dashboard- Displays the list of current customers on the customer page.
-
-    """
-    data = load_customers()
-    return data
+    customers = db_get_customers()
+    return customers
 
 
 # Add a new customer
@@ -579,6 +639,15 @@ def update_email_template():
 
     logger.info(f"New email template: {updated_email_template}")
     return jsonify({"success": True})
+
+
+@atexit.register
+def close_db_pool():
+
+    global pool
+    if pool:
+        print("Closing Global Connection Pool")
+        pool.close()
 
 
 if __name__ == "__main__":
