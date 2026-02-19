@@ -586,7 +586,7 @@
             tbody.innerHTML = products.map((p, idx) => `
                 <tr>
                     <td><strong>${p.name}</strong></td>
-                    <td>$${p.price.toFixed(2)}</td>
+                    <td>$${p.price}</td>
                     <td>
                         <div class="btn-group-actions">
                             <button class="btn btn-sm btn-primary" onclick="editProduct(${idx})">

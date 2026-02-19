@@ -231,8 +231,8 @@ def db_get_customers():
             GROUP BY c.name, c.email 
                 """
             )
-            customer_rows = cur.fetchall()
-            return customer_rows
+            customers = cur.fetchall()
+            return customers
 
 
 def save_customers(customers):
@@ -274,7 +274,7 @@ def save_customers(customers):
 
 def get_customers():
     customers = db_get_customers()
-    return customers
+    return jsonify(customers)
 
 
 # Add a new customer
@@ -432,13 +432,30 @@ def save_products(products):
 # Get the product list
 @app.route("/api/products")
 @require_api_key_or_session
-def get_products():
-    """
-    Opens the JSON product file and returns it as a python object
+# def get_products():
+#     """
+#     Opens the JSON product file and returns it as a python object
 
-    """
-    products = load_products()
-    return jsonify(products)
+#     """
+#     products = load_products()
+#     return jsonify(products)
+
+
+def db_get_products():
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+            SELECT id, name, price
+            FROM products
+            ORDER BY name      
+            """
+            )
+            products = cur.fetchall()
+            print(products)
+        return jsonify(products)
 
 
 # Add a new product
