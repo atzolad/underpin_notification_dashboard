@@ -8,6 +8,7 @@ from flask import (
     session,
     g,
     current_app,
+    abort,
 )
 import json
 import os
@@ -280,23 +281,62 @@ def get_customers():
 # Add a new customer
 @app.route("/api/customers", methods=["POST"])
 @require_api_key_or_session
+# def add_customer():
+#     """
+#     Post method. Takes a new customer in the Json format
+
+#     Loops through the names of the current customers and checks that the new customer doesn't already exist.
+
+#     Adds the new customer to the end of the customer list before saving the JSON customer file.
+#     """
+#     data = request.json
+
+#     if not data.get("name") or not data.get("email"):
+#         return jsonify({"error": "Name and email required"}), 400
+
+#     customers = load_customers()
+
+#     new_customer_name = data["name"]
+#     new_customer_name_sanitized = data["name"].strip().lower()
+
+#     for customer in customers:
+#         if customer["name"].lower() == new_customer_name_sanitized:
+#             return (
+#                 jsonify({"error": f"Customer {new_customer_name} already exists"}),
+#                 400,
+#             )
+
+#     new_customer = {
+#         "name": data["name"].strip(),
+#         "email": data["email"].strip(),
+#         "products": data.get("products", []),
+#     }
+
+#     customers.append(new_customer)
+#     save_customers(customers)
+
+#     logger.info(f"New customer added: {new_customer}")
+
+
+#     return jsonify(new_customer), 201
 def add_customer():
     """
-    Post method. Takes a new customer in the Json format
+    Post method. Takes a new customer in the JSON format.
 
     Loops through the names of the current customers and checks that the new customer doesn't already exist.
 
-    Adds the new customer to the end of the customer list before saving the JSON customer file.
-    """
-    data = request.json
+    Adds the new customer to the database.
 
-    if not data.get("name") or not data.get("email"):
+    """
+    customer_request = request.json
+
+    if not customer_request.get("name") or not customer_request.get("email"):
         return jsonify({"error": "Name and email required"}), 400
 
-    customers = load_customers()
+    customers = db_get_customers()
 
-    new_customer_name = data["name"]
-    new_customer_name_sanitized = data["name"].strip().lower()
+    new_customer_name = customer_request["name"]
+    new_customer_name_sanitized = customer_request["name"].strip().lower()
 
     for customer in customers:
         if customer["name"].lower() == new_customer_name_sanitized:
@@ -306,13 +346,37 @@ def add_customer():
             )
 
     new_customer = {
-        "name": data["name"].strip(),
-        "email": data["email"].strip(),
-        "products": data.get("products", []),
+        "name": customer_request["name"].strip(),
+        "email": customer_request["email"].strip(),
+        "products": customer_request.get("products", []),
     }
 
-    customers.append(new_customer)
-    save_customers(customers)
+    try:
+        pool = get_db_pool()
+
+        with pool.connection() as conn:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                    INSERT INTO customers (name, email, active)
+                    VALUES (%s, %s, true) RETURNING id; """,
+                        (new_customer["name"], new_customer["email"]),
+                    )
+                    new_customer_id = cur.fetchone()[0]
+                    new_customer["id"] = new_customer_id
+
+                    for product in new_customer["products"]:
+                        cur.execute(
+                            """
+                        INSERT INTO customer_products (customer_id, product_id)
+                        VALUES (%s, %s) """,
+                            (new_customer["id"], product["id"]),
+                        )
+
+    except Exception as e:
+        logger.error(f"Error adding customer to database: {e}")
+        return jsonify({"error": "Error adding customer/products to database"}), 400
 
     logger.info(f"New customer added: {new_customer}")
 
