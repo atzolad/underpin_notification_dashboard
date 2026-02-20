@@ -335,17 +335,23 @@ def add_customer():
     if not customer_request.get("name") or not customer_request.get("email"):
         return jsonify({"error": "Name and email required"}), 400
 
-    customers = db_get_customers()
+    if db_customer_already_exists(customer_request["name"].strip().lower()):
+        return (
+            jsonify({"error": f"Customer {customer_request["name"]} already exists"}),
+            400,
+        )
 
-    new_customer_name = customer_request["name"]
-    new_customer_name_sanitized = customer_request["name"].strip().lower()
+    # customers = db_get_customers()
 
-    for customer in customers:
-        if customer["name"].lower() == new_customer_name_sanitized:
-            return (
-                jsonify({"error": f"Customer {new_customer_name} already exists"}),
-                400,
-            )
+    # new_customer_name = customer_request["name"]
+    # new_customer_name_sanitized = customer_request["name"].strip().lower()
+
+    # for customer in customers:
+    #     if customer["name"].lower() == new_customer_name_sanitized:
+    #         return (
+    #             jsonify({"error": f"Customer {new_customer_name} already exists"}),
+    #             400,
+    #         )
 
     new_customer = {
         "name": customer_request["name"].strip(),
@@ -385,8 +391,24 @@ def add_customer():
     return jsonify(new_customer), 201
 
 
+def db_customer_already_exists(new_customer_name):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from customers
+            WHERE name=%s
+            LIMIT 1
+                """,
+                (new_customer_name,),
+            )
+            return cur.fetchone() is not None
+
+
 # Update a customer by index
-@app.route("/api/customers/<id>", methods=["PUT"])
+@app.route("/api/customers/<id>", methods=["PATCH"])
 @require_api_key_or_session
 # def update_customer(idx):
 #     """
@@ -427,40 +449,30 @@ def add_customer():
 
 
 def update_customer(id):
-    """
-    Put Method. Takes the index of the customer at the end of the url /<id> and replaces the customer at that index with the payload in Json format:
-
-    """
 
     customer_update_request = request.json
-    customers = db_get_customers()
+    print(f"Customer Update Request: \n {customer_update_request}")
+    customer = {}
 
-    if "name" in customer_update_request:
-        updated_customer_name = customer_update_request["name"]
-        updated_customer_name_sanitized = updated_customer_name.strip().lower()
+    if customer_update_request.get("name"):
+        if db_customer_already_exists(customer_update_request["name"].strip()):
+            return (
+                jsonify(
+                    {
+                        "error": f"Customer {customer_update_request["name"]} already exists"
+                    }
+                ),
+                400,
+            )
+        customer["name"] = customer_update_request["name"]
 
-        for i, customer in enumerate(customers):
-            if customer["name"].lower() == updated_customer_name_sanitized:
+    if customer_update_request.get("email"):
+        customer["email"] = customer_update_request["email"]
 
-                return (
-                    jsonify(
-                        {"error": f"Customer {updated_customer_name} already exists"}
-                    ),
-                    400,
-                )
+    if customer_update_request.get("products"):
+        customer["products"] = customer_update_request.get("products", [])
 
-        customer_update_request["name"] = customer_update_request["name"].strip()
-
-    if "email" in customer_update_request:
-        customer_update_request["email"] = customer_update_request["email"].strip()
-
-    # Update customer in DB
-
-    logger.info(f"Updated customer: {customer_update_request["name"]}")
-    return jsonify([]), 201
-
-
-def db_update_customer(customer):
+    print(f"Customer after checks: {customer}")
     pool = get_db_pool()
 
     with pool.connection() as conn:
@@ -473,23 +485,31 @@ def db_update_customer(customer):
                 if customer["name"] or customer["email"]:
 
                     if customer["name"]:
-                        args.append(customer["name"])
-                        updates.append("name = $%s", len(args))
+                        args.append(customer["name"].strip())
+                        updates.append(f"name = %s")
 
                     if customer["email"]:
-                        args.append(customer["email"])
-                        updates.append("email = $%s", len(args))
+                        args.append(customer["email"].strip())
+                        updates.append(f"email = %s")
 
-                    args.append(id)
+                    if updates:
+                        args.append(customer["id"])
 
                     cur.execute(
-                        """
-                        UPDATE customers SET %s WHERE id=%s RETURNING name, email,""",
-                        (updates.join(", "), len(args)),
+                        f"UPDATE customers SET {", ".join(updates)} WHERE id=%s RETURNING name, email",
+                        args,
                     )
 
-            if customer["products"]:
-                pass
+                if customer["products"]:
+                    for product_id in customer["products"]:
+                        cur.execute(
+                            """
+                        INSERT INTO customer_products (customer_id, product_id)
+                        VALUES (%s, %s) """,
+                            (id, product_id),
+                        )
+
+    return jsonify(customer), 201
 
 
 # Delete a customer by index

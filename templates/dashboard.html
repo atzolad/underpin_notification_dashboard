@@ -513,34 +513,68 @@
             }
         }
 
+        let originalProducts = [];
+        let editingCustomerId = null;
+        let originalCustomerName = null;
+        let originalCustomerEmail = null;
+
         function editCustomer(id) {
-            editingCustomerId = id;
             const c = customers.find(customer => customer.id == id);
+            editingCustomerId = id;
+            originalCustomerName = c.name
+            originalCustomerEmail = c.email
+
             document.getElementById('editCustomerName').value = c.name;
             document.getElementById('editCustomerEmail').value = c.email;
 
-            Array.from(document.getElementById('editCustomerProducts').options).forEach(opt => {
+            const options = Array.from(document.getElementById('editCustomerProducts').options);
+            options.forEach(opt => {
                 opt.selected = c.products.some(p => p.id === opt.value);
             });
+
+            originalProducts = options
+                .filter(opt => opt.selected)
+                .map(opt => opt.value)
+                .sort();
 
             new bootstrap.Modal(document.getElementById('editCustomerModal')).show();
         }
 
         async function saveEditCustomer(e) {
             e.preventDefault();
-            const products = Array.from(document.getElementById('editCustomerProducts').selectedOptions).map(o => o.value);
+            const products = Array.from(document.getElementById('editCustomerProducts').selectedOptions).map(o => o.value).sort();
+            const currentName = document.getElementById('editCustomerName').value
+            const currentEmail = document.getElementById('editCustomerEmail').value
 
-            const data = {
-                name: document.getElementById('editCustomerName').value,
-                email: document.getElementById('editCustomerEmail').value,
-                products: products
-            };
+            const productsChanged = originalProducts.length !== products.length || products.some(id => !originalProducts.includes(id));
+            const nameChanged = originalCustomerName !== currentName
+            const emailChanged = originalCustomerEmail !== currentEmail
+
+            if (!productsChanged && !nameChanged && !emailChanged) {
+                bootstrap.Modal.getInstance(document.getElementById('editCustomerModal')).hide();
+                return;
+            }
+
+            let editedCustomer = {}
+
+            if (nameChanged) {
+                editedCustomer["name"] = currentName
+            }
+
+            if (emailChanged) {
+                editedCustomer["email"] = currentEmail
+            }
+
+            if (productsChanged) {
+                editedCustomer["products"] = products
+            }
+
 
             try {
                 const resp = await fetch(`/api/customers/${editingCustomerId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(editCustomer)
                 });
 
                 const responseData = await resp.json();
@@ -555,7 +589,7 @@
                 }
 
             } catch (error) {
-                console.error('Error:, error');
+                console.error('Error:', error);
                 showAlert('customerAlert', 'Network error occurred', 'danger');
             }
         }
