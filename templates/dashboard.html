@@ -453,7 +453,6 @@
         async function loadCustomers() {
             const resp = await fetch('/api/customers');
             customers = await resp.json();
-            console.log(customers)
             renderCustomers();
             populateProductSelects();
         }
@@ -465,7 +464,7 @@
                     <td><strong>${c.name}</strong></td>
                     <td>${c.email}</td>
                     <td>
-                        ${c.products.map(p => `<span class="badge-product">${p}</span>`).join('')}
+                        ${c.products.map(p => `<span class="badge-product">${p["name"]}</span>`).join('')}
                     </td>
                     <td>
                         <div class="btn-group-actions">

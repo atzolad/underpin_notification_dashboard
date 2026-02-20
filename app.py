@@ -225,7 +225,7 @@ def db_get_customers():
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-            SELECT c.id, c.name, c.email, ARRAY_AGG (p.name ORDER BY p.name) AS products
+            SELECT c.id, c.name, c.email, ARRAY_AGG (JSON_BUILD_OBJECT('id', p.id, 'name', p.name) ORDER BY p.name) AS products
             FROM customers AS c
             JOIN customer_products AS cp on c.id = cp.customer_id
             JOIN products AS p on cp.product_id = p.id
