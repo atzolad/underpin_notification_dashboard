@@ -546,7 +546,7 @@
             const currentName = document.getElementById('editCustomerName').value
             const currentEmail = document.getElementById('editCustomerEmail').value
 
-            const productsChanged = originalProducts.length !== products.length || products.some(id => !originalProducts.includes(id));
+            // const productsChanged = originalProducts.length !== products.length || products.some(id => !originalProducts.includes(id));
             const nameChanged = originalCustomerName !== currentName
             const emailChanged = originalCustomerEmail !== currentEmail
 
@@ -557,6 +557,9 @@
 
             let editedCustomer = {}
 
+
+            editedCustomer["products"] = products
+
             if (nameChanged) {
                 editedCustomer["name"] = currentName
             }
@@ -565,9 +568,9 @@
                 editedCustomer["email"] = currentEmail
             }
 
-            if (productsChanged) {
-                editedCustomer["products"] = products
-            }
+            // if (productsChanged) {
+            //     editedCustomer["products"] = products
+            // }
 
 
             try {

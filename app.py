@@ -452,7 +452,7 @@ def update_customer(id):
 
     customer_update_request = request.json
     print(f"Customer Update Request: \n {customer_update_request}")
-    customer = {}
+    customer = {id: id}
 
     if customer_update_request.get("name"):
         if db_customer_already_exists(customer_update_request["name"].strip()):
@@ -482,25 +482,25 @@ def update_customer(id):
                 args = []
                 updates = []
 
-                if customer["name"] or customer["email"]:
+                if customer.get("name") or customer.get("email"):
 
-                    if customer["name"]:
+                    if customer.get("name"):
                         args.append(customer["name"].strip())
                         updates.append(f"name = %s")
 
-                    if customer["email"]:
+                    if customer.get("email"):
                         args.append(customer["email"].strip())
                         updates.append(f"email = %s")
 
                     if updates:
-                        args.append(customer["id"])
+                        args.append(id)
 
                     cur.execute(
                         f"UPDATE customers SET {", ".join(updates)} WHERE id=%s RETURNING name, email",
                         args,
                     )
 
-                if customer["products"]:
+                if customer.get("products"):
                     for product_id in customer["products"]:
                         cur.execute(
                             """
