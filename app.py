@@ -20,7 +20,7 @@ from google.cloud import storage
 from dotenv import load_dotenv
 import psycopg
 from psycopg_pool import ConnectionPool
-from psycopg.rows import dict_row
+from psycopg.rows import dict_row, scalar_row
 import atexit
 
 
@@ -227,8 +227,8 @@ def db_get_customers():
                 """
             SELECT c.id, c.name, c.email, ARRAY_AGG (JSON_BUILD_OBJECT('id', p.id, 'name', p.name) ORDER BY p.name) AS products
             FROM customers AS c
-            JOIN customer_products AS cp on c.id = cp.customer_id
-            JOIN products AS p on cp.product_id = p.id
+            LEFT JOIN customer_products AS cp on c.id = cp.customer_id
+            LEFT JOIN products AS p on cp.product_id = p.id
             GROUP BY c.name, c.id, c.email
                 """
             )
@@ -407,8 +407,29 @@ def db_customer_already_exists(new_customer_name):
             return cur.fetchone() is not None
 
 
+def db_get_products_per_customer(customer_id):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=scalar_row) as cur:
+            cur.execute(
+                """
+                SELECT p.id 
+                FROM products AS p
+                JOIN customer_products AS cp on p.id = cp.product_id
+                WHERE cp.customer_id = %s""",
+                (customer_id,),
+            )
+
+            products = cur.fetchall()
+            print(f"products: {products}")
+            str_products = [str(product) for product in products]
+            print(f"STRING PRODUCTS: {str_products}")
+            return str_products
+
+
 # Update a customer by index
-@app.route("/api/customers/<id>", methods=["PATCH"])
+@app.route("/api/customers/<customer_id>", methods=["PATCH"])
 @require_api_key_or_session
 # def update_customer(idx):
 #     """
@@ -448,68 +469,97 @@ def db_customer_already_exists(new_customer_name):
 #     return jsonify(customers[idx]), 201
 
 
-def update_customer(id):
+def update_customer(customer_id):
+    products_to_add = set()
+    products_to_del = set()
 
-    customer_update_request = request.json
-    print(f"Customer Update Request: \n {customer_update_request}")
-    customer = {id: id}
+    try:
 
-    if customer_update_request.get("name"):
-        if db_customer_already_exists(customer_update_request["name"].strip()):
-            return (
-                jsonify(
-                    {
-                        "error": f"Customer {customer_update_request["name"]} already exists"
-                    }
-                ),
-                400,
-            )
-        customer["name"] = customer_update_request["name"]
+        customer_update_request = request.json
+        print(f"Customer Update Request: \n {customer_update_request}")
+        customer = {"id": customer_id}
 
-    if customer_update_request.get("email"):
-        customer["email"] = customer_update_request["email"]
+        if customer_update_request.get("name"):
+            if db_customer_already_exists(customer_update_request["name"].strip()):
+                return (
+                    jsonify(
+                        {
+                            "error": f"Customer {customer_update_request["name"]} already exists"
+                        }
+                    ),
+                    400,
+                )
+            customer["name"] = customer_update_request["name"]
 
-    if customer_update_request.get("products"):
-        customer["products"] = customer_update_request.get("products", [])
+        if customer_update_request.get("email"):
+            customer["email"] = customer_update_request["email"]
 
-    print(f"Customer after checks: {customer}")
-    pool = get_db_pool()
+        if "products" in customer_update_request:
+            # customer["products"] = customer_update_request.get("products", [])
 
-    with pool.connection() as conn:
-        with conn:
-            with conn.cursor() as cur:
+            new_ids = {
+                product_id for product_id in customer_update_request.get("products", [])
+            }
 
-                args = []
-                updates = []
+            current_ids = set(db_get_products_per_customer(customer_id))
+            products_to_add = new_ids - current_ids
+            products_to_del = current_ids - new_ids
 
-                if customer.get("name") or customer.get("email"):
+        print(f"Customer after checks: {customer}")
+        pool = get_db_pool()
 
-                    if customer.get("name"):
-                        args.append(customer["name"].strip())
-                        updates.append(f"name = %s")
+        with pool.connection() as conn:
+            with conn:
+                with conn.cursor() as cur:
 
-                    if customer.get("email"):
-                        args.append(customer["email"].strip())
-                        updates.append(f"email = %s")
+                    args = []
+                    updates = []
 
-                    if updates:
-                        args.append(id)
+                    if customer.get("name") or customer.get("email"):
 
-                    cur.execute(
-                        f"UPDATE customers SET {", ".join(updates)} WHERE id=%s RETURNING name, email",
-                        args,
-                    )
+                        if customer.get("name"):
+                            args.append(customer["name"].strip())
+                            updates.append(f"name = %s")
 
-                if customer.get("products"):
-                    for product_id in customer["products"]:
+                        if customer.get("email"):
+                            args.append(customer["email"].strip())
+                            updates.append(f"email = %s")
+
+                        if updates:
+                            args.append(customer_id)
+
+                            cur.execute(
+                                f"UPDATE customers SET {", ".join(updates)} WHERE id=%s RETURNING name, email",
+                                args,
+                            )
+                            updated_row = cur.fetchone()
+                            customer["name"] = updated_row[0]
+                            customer["email"] = updated_row[1]
+
+                    if products_to_add:
+                        for product_id in products_to_add:
+                            cur.execute(
+                                """
+                            INSERT INTO customer_products (customer_id, product_id)
+                            VALUES (%s, %s) """,
+                                (customer_id, product_id),
+                            )
+
+                    if products_to_del:
                         cur.execute(
                             """
-                        INSERT INTO customer_products (customer_id, product_id)
-                        VALUES (%s, %s) """,
-                            (id, product_id),
+                        DELETE FROM customer_products
+                        WHERE customer_id = %s 
+                        AND product_id = ANY(%s)
+                        """,
+                            (customer_id, list(products_to_del)),
                         )
 
-    return jsonify(customer), 201
+        return jsonify(customer), 201
+
+    except Exception as e:
+        logger.error(f"Error updating customer: {e}")
+        return jsonify({"error:" "An unexpected errror occurred"}), 500
 
 
 # Delete a customer by index

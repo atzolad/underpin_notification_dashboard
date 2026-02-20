@@ -464,7 +464,7 @@
                     <td><strong>${c.name}</strong></td>
                     <td>${c.email}</td>
                     <td>
-                        ${c.products.map(p => `<span class="badge-product">${p["name"]}</span>`).join('')}
+                        ${(c.products ?? []).filter(p => p && p.name).map(p => `<span class="badge-product">${p["name"]}</span>`).join('')}
                     </td>
                     <td>
                         <div class="btn-group-actions">
@@ -546,7 +546,7 @@
             const currentName = document.getElementById('editCustomerName').value
             const currentEmail = document.getElementById('editCustomerEmail').value
 
-            // const productsChanged = originalProducts.length !== products.length || products.some(id => !originalProducts.includes(id));
+            const productsChanged = originalProducts.length !== products.length || products.some(id => !originalProducts.includes(id));
             const nameChanged = originalCustomerName !== currentName
             const emailChanged = originalCustomerEmail !== currentEmail
 
@@ -575,9 +575,9 @@
 
             try {
                 const resp = await fetch(`/api/customers/${editingCustomerId}`, {
-                    method: 'PUT',
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(editCustomer)
+                    body: JSON.stringify(editedCustomer)
                 });
 
                 const responseData = await resp.json();
