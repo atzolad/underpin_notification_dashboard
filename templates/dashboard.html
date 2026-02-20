@@ -453,13 +453,14 @@
         async function loadCustomers() {
             const resp = await fetch('/api/customers');
             customers = await resp.json();
+            console.log(customers)
             renderCustomers();
             populateProductSelects();
         }
 
         function renderCustomers() {
             const tbody = document.getElementById('customerTableBody');
-            tbody.innerHTML = customers.map((c, idx) => `
+            tbody.innerHTML = customers.map((c) => `
                 <tr>
                     <td><strong>${c.name}</strong></td>
                     <td>${c.email}</td>
@@ -468,10 +469,10 @@
                     </td>
                     <td>
                         <div class="btn-group-actions">
-                            <button class="btn btn-sm btn-primary" onclick="editCustomer(${idx})">
+                            <button class="btn btn-sm btn-primary" onclick="editCustomer('${c.id}')">
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${idx})">
+                            <button class="btn btn-sm btn-danger" onclick="deleteCustomer('${c.id}')">
                                 <i class="bi bi-trash"></i> Delete
                             </button>
                         </div>
@@ -513,9 +514,9 @@
             }
         }
 
-        function editCustomer(idx) {
-            editingCustomerIdx = idx;
-            const c = customers[idx];
+        function editCustomer(id) {
+            editingCustomerId = id;
+            const c = customers.find(customer => customer.id == id);
             document.getElementById('editCustomerName').value = c.name;
             document.getElementById('editCustomerEmail').value = c.email;
 
@@ -537,7 +538,7 @@
             };
 
             try {
-                const resp = await fetch(`/api/customers/${editingCustomerIdx}`, {
+                const resp = await fetch(`/api/customers/${editingCustomerId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)

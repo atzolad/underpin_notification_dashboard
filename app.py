@@ -225,11 +225,11 @@ def db_get_customers():
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-            SELECT c.name, c.email, ARRAY_AGG (p.name ORDER BY p.name) AS products
+            SELECT c.id, c.name, c.email, ARRAY_AGG (p.name ORDER BY p.name) AS products
             FROM customers AS c
             JOIN customer_products AS cp on c.id = cp.customer_id
             JOIN products AS p on cp.product_id = p.id
-            GROUP BY c.name, c.email 
+            GROUP BY c.name, c.id, c.email
                 """
             )
             customers = cur.fetchall()
@@ -386,26 +386,61 @@ def add_customer():
 
 
 # Update a customer by index
-@app.route("/api/customers/<int:idx>", methods=["PUT"])
+@app.route("/api/customers/<id>", methods=["PUT"])
 @require_api_key_or_session
-def update_customer(idx):
+# def update_customer(idx):
+#     """
+#     Put Method. Takes the index of the customer at the end of the url /<int:idx> and replaces the customer at that index with the payload in Json format:
+
+#     """
+
+#     data = request.json
+#     customers = load_customers()
+
+#     if idx < 0 or idx >= len(customers):
+#         return jsonify({"error": "Customer not found"}), 404
+
+#     if "name" in data:
+#         updated_customer_name = data["name"]
+#         updated_customer_name_sanitized = updated_customer_name.strip().lower()
+
+#         for i, customer in enumerate(customers):
+#             if i != idx and customer["name"].lower() == updated_customer_name_sanitized:
+
+#                 return (
+#                     jsonify(
+#                         {"error": f"Customer {updated_customer_name} already exists"}
+#                     ),
+#                     400,
+#                 )
+
+#         data["name"] = data["name"].strip()
+
+#     if "email" in data:
+#         data["email"] = data["email"].strip()
+
+#     customers[idx].update(data)
+#     save_customers(customers)
+
+#     logger.info(f"Updated customer: {data["name"]} at index {idx}")
+#     return jsonify(customers[idx]), 201
+
+
+def update_customer(id):
     """
-    Put Method. Takes the index of the customer at the end of the url /<int:idx> and replaces the customer at that index with the payload in Json format:
+    Put Method. Takes the index of the customer at the end of the url /<id> and replaces the customer at that index with the payload in Json format:
 
     """
 
-    data = request.json
-    customers = load_customers()
+    customer_update_request = request.json
+    customers = db_get_customers()
 
-    if idx < 0 or idx >= len(customers):
-        return jsonify({"error": "Customer not found"}), 404
-
-    if "name" in data:
-        updated_customer_name = data["name"]
+    if "name" in customer_update_request:
+        updated_customer_name = customer_update_request["name"]
         updated_customer_name_sanitized = updated_customer_name.strip().lower()
 
         for i, customer in enumerate(customers):
-            if i != idx and customer["name"].lower() == updated_customer_name_sanitized:
+            if customer["name"].lower() == updated_customer_name_sanitized:
 
                 return (
                     jsonify(
@@ -414,16 +449,47 @@ def update_customer(idx):
                     400,
                 )
 
-        data["name"] = data["name"].strip()
+        customer_update_request["name"] = customer_update_request["name"].strip()
 
-    if "email" in data:
-        data["email"] = data["email"].strip()
+    if "email" in customer_update_request:
+        customer_update_request["email"] = customer_update_request["email"].strip()
 
-    customers[idx].update(data)
-    save_customers(customers)
+    # Update customer in DB
 
-    logger.info(f"Updated customer: {data["name"]} at index {idx}")
-    return jsonify(customers[idx]), 201
+    logger.info(f"Updated customer: {customer_update_request["name"]}")
+    return jsonify([]), 201
+
+
+def db_update_customer(customer):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn:
+            with conn.cursor() as cur:
+
+                args = []
+                updates = []
+
+                if customer["name"] or customer["email"]:
+
+                    if customer["name"]:
+                        args.append(customer["name"])
+                        updates.append("name = $%s", len(args))
+
+                    if customer["email"]:
+                        args.append(customer["email"])
+                        updates.append("email = $%s", len(args))
+
+                    args.append(id)
+
+                    cur.execute(
+                        """
+                        UPDATE customers SET %s WHERE id=%s RETURNING name, email,""",
+                        (updates.join(", "), len(args)),
+                    )
+
+            if customer["products"]:
+                pass
 
 
 # Delete a customer by index
