@@ -724,7 +724,7 @@
 
         // Utility
         function populateProductSelects() {
-            const options = products.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            const options = products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
             document.getElementById('customerProducts').innerHTML = options;
             document.getElementById('editCustomerProducts').innerHTML = options;
         }

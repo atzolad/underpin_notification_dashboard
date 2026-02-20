@@ -330,6 +330,8 @@ def add_customer():
     """
     customer_request = request.json
 
+    print(customer_request)
+
     if not customer_request.get("name") or not customer_request.get("email"):
         return jsonify({"error": "Name and email required"}), 400
 
@@ -366,12 +368,12 @@ def add_customer():
                     new_customer_id = cur.fetchone()[0]
                     new_customer["id"] = new_customer_id
 
-                    for product in new_customer["products"]:
+                    for product_id in new_customer["products"]:
                         cur.execute(
                             """
                         INSERT INTO customer_products (customer_id, product_id)
                         VALUES (%s, %s) """,
-                            (new_customer["id"], product["id"]),
+                            (new_customer["id"], product_id),
                         )
 
     except Exception as e:
