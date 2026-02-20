@@ -520,7 +520,7 @@
             document.getElementById('editCustomerEmail').value = c.email;
 
             Array.from(document.getElementById('editCustomerProducts').options).forEach(opt => {
-                opt.selected = c.products.includes(opt.value);
+                opt.selected = c.products.some(p => p.id === opt.value);
             });
 
             new bootstrap.Modal(document.getElementById('editCustomerModal')).show();
