@@ -262,6 +262,11 @@ def save_customers(customers):
 # Get the customer list
 @app.route("/api/customers")
 @require_api_key_or_session
+def get_customers():
+    customers = db_get_customers()
+    return jsonify(customers)
+
+
 # def get_customers():
 #     """
 #     Uses the load_customers function to open the Customer JSON file and return the data as a python object.
@@ -274,52 +279,9 @@ def save_customers(customers):
 #     return data
 
 
-def get_customers():
-    customers = db_get_customers()
-    return jsonify(customers)
-
-
 # Add a new customer
 @app.route("/api/customers", methods=["POST"])
 @require_api_key_or_session
-# def add_customer():
-#     """
-#     Post method. Takes a new customer in the Json format
-
-#     Loops through the names of the current customers and checks that the new customer doesn't already exist.
-
-#     Adds the new customer to the end of the customer list before saving the JSON customer file.
-#     """
-#     data = request.json
-
-#     if not data.get("name") or not data.get("email"):
-#         return jsonify({"error": "Name and email required"}), 400
-
-#     customers = load_customers()
-
-#     new_customer_name = data["name"]
-#     new_customer_name_sanitized = data["name"].strip().lower()
-
-#     for customer in customers:
-#         if customer["name"].lower() == new_customer_name_sanitized:
-#             return (
-#                 jsonify({"error": f"Customer {new_customer_name} already exists"}),
-#                 400,
-#             )
-
-#     new_customer = {
-#         "name": data["name"].strip(),
-#         "email": data["email"].strip(),
-#         "products": data.get("products", []),
-#     }
-
-#     customers.append(new_customer)
-#     save_customers(customers)
-
-#     logger.info(f"New customer added: {new_customer}")
-
-
-#     return jsonify(new_customer), 201
 def add_customer():
     """
     Post method. Takes a new customer in the JSON format.
@@ -385,11 +347,51 @@ def add_customer():
 
     except Exception as e:
         logger.error(f"Error adding customer to database: {e}")
-        return jsonify({"error": "Error adding customer/products to database"}), 400
+        return jsonify({"error": "Error adding customer/products to database"}), 500
 
     logger.info(f"New customer added: {new_customer}")
 
     return jsonify(new_customer), 201
+
+
+# def add_customer():
+#     """
+#     Post method. Takes a new customer in the Json format
+
+#     Loops through the names of the current customers and checks that the new customer doesn't already exist.
+
+#     Adds the new customer to the end of the customer list before saving the JSON customer file.
+#     """
+#     data = request.json
+
+#     if not data.get("name") or not data.get("email"):
+#         return jsonify({"error": "Name and email required"}), 400
+
+#     customers = load_customers()
+
+#     new_customer_name = data["name"]
+#     new_customer_name_sanitized = data["name"].strip().lower()
+
+#     for customer in customers:
+#         if customer["name"].lower() == new_customer_name_sanitized:
+#             return (
+#                 jsonify({"error": f"Customer {new_customer_name} already exists"}),
+#                 400,
+#             )
+
+#     new_customer = {
+#         "name": data["name"].strip(),
+#         "email": data["email"].strip(),
+#         "products": data.get("products", []),
+#     }
+
+#     customers.append(new_customer)
+#     save_customers(customers)
+
+#     logger.info(f"New customer added: {new_customer}")
+
+
+#     return jsonify(new_customer), 201
 
 
 def db_customer_name_exists(new_customer_name):
@@ -400,7 +402,7 @@ def db_customer_name_exists(new_customer_name):
             cur.execute(
                 """
             SELECT 1 from customers
-            WHERE name=%s
+            WHERE LOWER(name)=%s
             LIMIT 1
                 """,
                 (new_customer_name,),
@@ -442,7 +444,7 @@ def update_customer(customer_id):
         customer = {"id": customer_id}
 
         if customer_update_request.get("name"):
-            if db_customer_name_exists(customer_update_request["name"].strip()):
+            if db_customer_name_exists(customer_update_request["name"].strip().lower()):
                 return (
                     jsonify(
                         {
@@ -715,6 +717,38 @@ def get_products():
         return jsonify(products)
 
 
+def db_product_exists(product_id):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from products
+            WHERE id=%s
+            LIMIT 1
+            """,
+                (product_id,),
+            )
+            return cur.fetchone() is not None
+
+
+def db_product_name_exists(product_name):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from products
+            WHERE LOWER(name)=%s
+            LIMIT 1
+            """,
+                (product_name,),
+            )
+            return cur.fetchone() is not None
+
+
 # Add a new product
 @app.route("/api/products", methods=["POST"])
 @require_api_key_or_session
@@ -722,31 +756,75 @@ def add_product():
     """
     POST method. Accepts a body of:
 
-
      {
     "name": "Newname",
     "price": "99.99")
     }
 
-    If the product name does not already exist- it adds the new product to the product list JSON file and saves it. Returns a 400 error if the product already exists, otherwise returns the info for the new product in JSON format.
+    If the product name does not already exist- it adds the new product to the db. Returns a 400 error if the product already exists, otherwise returns the info for the new product in JSON format.
 
     """
-    data = request.json
-    products = load_products()
-    new_product_name = data["name"]
-    new_product_name_sanitized = new_product_name.strip().lower()
+    try:
+        new_product_request = request.json
+        new_product_name = new_product_request["name"]
+        new_product_name_sanitized = new_product_name.strip().lower()
 
-    for product in products:
-        if product["name"].lower() == new_product_name_sanitized:
+        if db_product_name_exists(new_product_name_sanitized):
             return jsonify({"error": f"Product {new_product_name} already exists"}), 400
 
-    new_product = {"name": data["name"].strip(), "price": float(data["price"])}
+        new_product = {
+            "name": new_product_name.strip(),
+            "price": float(new_product_request["price"]),
+        }
 
-    products.append(new_product)
-    save_products(products)
+        pool = get_db_pool()
 
-    logger.info(f"Added Product: {new_product["name"]}")
-    return jsonify(new_product), 201
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                INSERT INTO products (name, price, active)
+                VALUES (%s, %s, true)""",
+                    (new_product["name"], new_product["price"]),
+                )
+
+        logger.info(f"Added Product: {new_product["name"]}")
+        return jsonify(new_product), 201
+
+    except Exception as e:
+        logger.error(f"Error adding product to database: {e}")
+        return jsonify({"error": "Error adding product to database"}), 500
+
+
+# def add_product():
+#     """
+#     POST method. Accepts a body of:
+
+
+#      {
+#     "name": "Newname",
+#     "price": "99.99")
+#     }
+
+#     If the product name does not already exist- it adds the new product to the product list JSON file and saves it. Returns a 400 error if the product already exists, otherwise returns the info for the new product in JSON format.
+
+#     """
+#     data = request.json
+#     products = load_products()
+#     new_product_name = data["name"]
+#     new_product_name_sanitized = new_product_name.strip().lower()
+
+#     for product in products:
+#         if product["name"].lower() == new_product_name_sanitized:
+#             return jsonify({"error": f"Product {new_product_name} already exists"}), 400
+
+#     new_product = {"name": data["name"].strip(), "price": float(data["price"])}
+
+#     products.append(new_product)
+#     save_products(products)
+
+#     logger.info(f"Added Product: {new_product["name"]}")
+#     return jsonify(new_product), 201
 
 
 # Update a product by index
