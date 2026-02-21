@@ -61,7 +61,7 @@ if not CONN_STR:
 logger.info(f"Initializing the connection pool")
 
 try:
-    pool = ConnectionPool(conninfo=CONN_STR)
+    pool = ConnectionPool(conninfo=CONN_STR, min_size=1, max_size=10)
     logger.info(f"Connection pool initialized")
 
 except Exception as e:
@@ -540,6 +540,9 @@ def update_product(product_id):
     except Exception as e:
         logger.error(f"Error updating product: {e}")
         return jsonify({"error": "Error updating product"}), 500
+
+
+# TODO - Need to handle when a customer or product is soft deleted and a new one is added with the same name. Currently fails but it would be confusing to the user as to why.
 
 
 # Delete a product by id
