@@ -857,13 +857,13 @@ def update_product(product_id):
                 )
             product["name"] = product_update_request["name"]
 
-        if product_update_request.get("email"):
-            product["email"] = product_update_request["email"]
+        if product_update_request.get("price"):
+            product["price"] = product_update_request["price"]
 
         pool = get_db_pool()
 
         with pool.connection() as conn:
-            with pool.cursor() as cur:
+            with conn.cursor() as cur:
 
                 args = []
                 updates = []
@@ -877,6 +877,8 @@ def update_product(product_id):
                     updates.append(f"price = %s")
 
                 if updates:
+                    args.append(product_id)
+
                     cur.execute(
                         f"UPDATE products SET {", ".join(updates)} WHERE id= %s",
                         args,

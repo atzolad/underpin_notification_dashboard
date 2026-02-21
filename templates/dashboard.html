@@ -555,7 +555,7 @@
                 return;
             }
 
-            let editedCustomer = {}
+            let editedCustomer = {};
 
 
             editedCustomer["products"] = products
@@ -620,16 +620,16 @@
 
         function renderProducts() {
             const tbody = document.getElementById('productTableBody');
-            tbody.innerHTML = products.map((p, idx) => `
+            tbody.innerHTML = products.map((p) => `
                 <tr>
                     <td><strong>${p.name}</strong></td>
                     <td>$${p.price}</td>
                     <td>
                         <div class="btn-group-actions">
-                            <button class="btn btn-sm btn-primary" onclick="editProduct(${idx})">
+                            <button class="btn btn-sm btn-primary" onclick="editProduct('${p.id}')">
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${idx})">
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">
                                 <i class="bi bi-trash"></i> Delete
                             </button>
                         </div>
@@ -669,27 +669,51 @@
             }
         }
 
-        function editProduct(idx) {
-            editingProductIdx = idx;
-            const p = products[idx];
+        originalProductName = null;
+        originalProductPrice = null;
+
+        function editProduct(id) {
+            const p = products.find(product => product.id == id);
+            editingProductId = id;
+            originalProductName = p.name
+            originalProductPrice = p.price
+
             document.getElementById('editProductName').value = p.name;
             document.getElementById('editProductPrice').value = p.price;
+
             new bootstrap.Modal(document.getElementById('editProductModal')).show();
         }
 
         async function saveEditProduct(e) {
             e.preventDefault();
-            const data = {
-                name: document.getElementById('editProductName').value,
-                price: document.getElementById('editProductPrice').value
-            };
+
+            const currentName = document.getElementById('editProductName').value
+            const currentPrice = document.getElementById('editProductPrice').value
+
+            const nameChanged = originalProductName !== currentName
+            const priceChanged = originalProductPrice !== currentPrice
+
+            if (!nameChanged && !priceChanged) {
+                bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+                return;
+            }
+
+            let editedProduct = {};
+
+            if (nameChanged) {
+                editedProduct["name"] = currentName
+            }
+
+            if (priceChanged) {
+                editedProduct["price"] = currentPrice
+            }
 
             try {
 
-                const resp = await fetch(`/api/products/${editingProductIdx}`, {
-                    method: 'PUT',
+                const resp = await fetch(`/api/products/${editingProductId}`, {
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(editedProduct)
                 });
 
                 const responseData = await resp.json();
