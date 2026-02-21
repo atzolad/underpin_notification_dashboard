@@ -229,6 +229,7 @@ def db_get_customers():
             FROM customers AS c
             LEFT JOIN customer_products AS cp on c.id = cp.customer_id
             LEFT JOIN products AS p on cp.product_id = p.id
+            WHERE c.active = true
             GROUP BY c.name, c.id, c.email
                 """
             )
@@ -335,7 +336,7 @@ def add_customer():
     if not customer_request.get("name") or not customer_request.get("email"):
         return jsonify({"error": "Name and email required"}), 400
 
-    if db_customer_already_exists(customer_request["name"].strip().lower()):
+    if db_customer_name_exists(customer_request["name"].strip().lower()):
         return (
             jsonify({"error": f"Customer {customer_request["name"]} already exists"}),
             400,
@@ -391,7 +392,7 @@ def add_customer():
     return jsonify(new_customer), 201
 
 
-def db_customer_already_exists(new_customer_name):
+def db_customer_name_exists(new_customer_name):
     pool = get_db_pool()
 
     with pool.connection() as conn:
@@ -431,44 +432,6 @@ def db_get_products_per_customer(customer_id):
 # Update a customer by index
 @app.route("/api/customers/<customer_id>", methods=["PATCH"])
 @require_api_key_or_session
-# def update_customer(idx):
-#     """
-#     Put Method. Takes the index of the customer at the end of the url /<int:idx> and replaces the customer at that index with the payload in Json format:
-
-#     """
-
-#     data = request.json
-#     customers = load_customers()
-
-#     if idx < 0 or idx >= len(customers):
-#         return jsonify({"error": "Customer not found"}), 404
-
-#     if "name" in data:
-#         updated_customer_name = data["name"]
-#         updated_customer_name_sanitized = updated_customer_name.strip().lower()
-
-#         for i, customer in enumerate(customers):
-#             if i != idx and customer["name"].lower() == updated_customer_name_sanitized:
-
-#                 return (
-#                     jsonify(
-#                         {"error": f"Customer {updated_customer_name} already exists"}
-#                     ),
-#                     400,
-#                 )
-
-#         data["name"] = data["name"].strip()
-
-#     if "email" in data:
-#         data["email"] = data["email"].strip()
-
-#     customers[idx].update(data)
-#     save_customers(customers)
-
-#     logger.info(f"Updated customer: {data["name"]} at index {idx}")
-#     return jsonify(customers[idx]), 201
-
-
 def update_customer(customer_id):
     products_to_add = set()
     products_to_del = set()
@@ -476,11 +439,10 @@ def update_customer(customer_id):
     try:
 
         customer_update_request = request.json
-        print(f"Customer Update Request: \n {customer_update_request}")
         customer = {"id": customer_id}
 
         if customer_update_request.get("name"):
-            if db_customer_already_exists(customer_update_request["name"].strip()):
+            if db_customer_name_exists(customer_update_request["name"].strip()):
                 return (
                     jsonify(
                         {
@@ -505,7 +467,6 @@ def update_customer(customer_id):
             products_to_add = new_ids - current_ids
             products_to_del = current_ids - new_ids
 
-        print(f"Customer after checks: {customer}")
         pool = get_db_pool()
 
         with pool.connection() as conn:
@@ -562,26 +523,129 @@ def update_customer(customer_id):
         return jsonify({"error:" "An unexpected errror occurred"}), 500
 
 
+# def update_customer(idx):
+#     """
+#     Put Method. Takes the index of the customer at the end of the url /<int:idx> and replaces the customer at that index with the payload in Json format:
+
+#     """
+
+#     data = request.json
+#     customers = load_customers()
+
+#     if idx < 0 or idx >= len(customers):
+#         return jsonify({"error": "Customer not found"}), 404
+
+#     if "name" in data:
+#         updated_customer_name = data["name"]
+#         updated_customer_name_sanitized = updated_customer_name.strip().lower()
+
+#         for i, customer in enumerate(customers):
+#             if i != idx and customer["name"].lower() == updated_customer_name_sanitized:
+
+#                 return (
+#                     jsonify(
+#                         {"error": f"Customer {updated_customer_name} already exists"}
+#                     ),
+#                     400,
+#                 )
+
+#         data["name"] = data["name"].strip()
+
+#     if "email" in data:
+#         data["email"] = data["email"].strip()
+
+#     customers[idx].update(data)
+#     save_customers(customers)
+
+#     logger.info(f"Updated customer: {data["name"]} at index {idx}")
+#     return jsonify(customers[idx]), 201
+
+
+def db_customer_already_exists(customer_id):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from customers
+            WHERE id=%s
+            LIMIT 1
+                """,
+                (customer_id,),
+            )
+            return cur.fetchone() is not None
+
+
 # Delete a customer by index
-@app.route("/api/customers/<int:idx>", methods=["DELETE"])
+@app.route("/api/customers/<customer_id>", methods=["DELETE"])
 @require_api_key_or_session
-def delete_customer(idx):
+def delete_customer(customer_id):
     """
-    Delete Method. Takes the index of the customer at the end of the url /<int:idx> and deletes that customer from the JSON file and saves it. Returns a 404 error if the customer is not found.
+    Delete Method. Takes the index of the customer at the end of the url /<customer_id> and deletes that customer from the db. Returns a 404 error if the customer is not found.
 
     """
 
-    customers = load_customers()
+    try:
+        if not db_customer_already_exists(customer_id):
+            logger.warning(f"Customer with id {customer_id} not found in db")
+            return jsonify({"error": "Customer not found"}), 404
 
-    if idx < 0 or idx >= len(customers):
-        return jsonify({"error": "Customer not found"}), 404
+        pool = get_db_pool()
 
-    customer_to_be_del = customers[idx]
-    customers.pop(idx)
-    save_customers(customers)
+        with pool.connection() as conn:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                    UPDATE customers
+                    SET active = false
+                    WHERE id = %s""",
+                        (customer_id,),
+                    )
 
-    logger.info(f"Deleted customer: {customer_to_be_del} at index: {idx}")
-    return jsonify({"deleted": f"Customer {customer_to_be_del["name"]} deleted!"}), 200
+                    cur.execute(
+                        """
+                    DELETE FROM customer_products
+                    WHERE customer_id = %s
+                    """,
+                        (customer_id,),
+                    )
+
+        logger.info(f"Deleted customer with id {customer_id}")
+        return (
+            jsonify({"deleted": f"Customer deleted!"}),
+            200,
+        )
+
+    except Exception as e:
+        logger.error(f"Error deleting customer with id {customer_id}: {e}")
+        return (
+            jsonify({"error": "Error deleting customer"}),
+            500,
+        )
+
+
+# # Delete a customer by index
+# @app.route("/api/customers/<int:idx>", methods=["DELETE"])
+# @require_api_key_or_session
+# def delete_customer(idx):
+#     """
+#     Delete Method. Takes the index of the customer at the end of the url /<int:idx> and deletes that customer from the JSON file and saves it. Returns a 404 error if the customer is not found.
+
+#     """
+
+#     customers = load_customers()
+
+#     if idx < 0 or idx >= len(customers):
+#         return jsonify({"error": "Customer not found"}), 404
+
+#     customer_to_be_del = customers[idx]
+#     customers.pop(idx)
+#     save_customers(customers)
+
+#     logger.info(f"Deleted customer: {customer_to_be_del} at index: {idx}")
+#     return jsonify({"deleted": f"Customer {customer_to_be_del["name"]} deleted!"}), 200
 
 
 # Load the product list
@@ -656,7 +720,6 @@ def db_get_products():
             """
             )
             products = cur.fetchall()
-            print(products)
         return jsonify(products)
 
 
