@@ -522,7 +522,7 @@ def update_customer(customer_id):
 
     except Exception as e:
         logger.error(f"Error updating customer: {e}")
-        return jsonify({"error:" "An unexpected errror occurred"}), 500
+        return jsonify({"error:" "Error updating customer"}), 500
 
 
 # def update_customer(idx):
@@ -828,13 +828,11 @@ def add_product():
 
 
 # Update a product by index
-@app.route("/api/products/<int:idx>", methods=["PUT"])
+@app.route("/api/products/<product_id>", methods=["PATCH"])
 @require_api_key_or_session
-def update_product(idx):
+def update_product(product_id):
     """
-    PUT Method. Takes the index of the product at the end of the url /<int:idx> and replaces the product at that index with the payload in Json format. Returns a 404 error if the product isn't found.
-
-
+    PATCH Method. Takes the index of the product at the end of the url /<product_id> and updates that product. Returns a 404 error if the product isn't found.
 
     {
         "name": "NewProduct",
@@ -842,33 +840,95 @@ def update_product(idx):
     }
 
     """
-    data = request.json
-    products = load_products()
 
-    if idx < 0 or idx >= len(products):
-        return jsonify({"error": "Product not found"}), 404
+    try:
+        product_update_request = request.json
+        product = {"id": product_id}
 
-    if "name" in data:
-        updated_product_name = data["name"]
-        updated_product_name_sanitized = updated_product_name.strip().lower()
-
-        for i, product in enumerate(products):
-            if i != idx and product["name"].lower() == updated_product_name_sanitized:
-
+        if product_update_request.get("name"):
+            if db_product_name_exists(product_update_request["name"].strip().lower()):
                 return (
                     jsonify(
-                        {"error": f"Customer {updated_product_name} already exists"}
+                        {
+                            "error": f"Product {product_update_request["name"]} already exists"
+                        }
                     ),
                     400,
                 )
+            product["name"] = product_update_request["name"]
 
-    updated_product = {"name": data["name"].strip(), "price": float(data["price"])}
+        if product_update_request.get("email"):
+            product["email"] = product_update_request["email"]
 
-    products[idx].update(updated_product)
-    save_products(products)
+        pool = get_db_pool()
 
-    logger.info(f"Update product: {products[idx]} at index: {idx}")
-    return jsonify(products[idx])
+        with pool.connection() as conn:
+            with pool.cursor() as cur:
+
+                args = []
+                updates = []
+
+                if product.get("name"):
+                    args.append(product["name".strip()])
+                    updates.append(f"name = %s")
+
+                if product.get("price"):
+                    args.append(product["price"])
+                    updates.append(f"price = %s")
+
+                if updates:
+                    cur.execute(
+                        f"UPDATE products SET {", ".join(updates)} WHERE id= %s",
+                        args,
+                    )
+            conn.commit()
+
+        logger.info(f"Updated product with id {product_id}")
+        return jsonify(product)
+
+    except Exception as e:
+        logger.error(f"Error updating product: {e}")
+        return jsonify({"error": "Error updating product"}), 500
+
+
+# def update_product(idx):
+#     """
+#     PUT Method. Takes the index of the product at the end of the url /<int:idx> and replaces the product at that index with the payload in Json format. Returns a 404 error if the product isn't found.
+
+
+#     {
+#         "name": "NewProduct",
+#         "price": "99.99",
+#     }
+
+#     """
+#     data = request.json
+#     products = load_products()
+
+#     if idx < 0 or idx >= len(products):
+#         return jsonify({"error": "Product not found"}), 404
+
+#     if "name" in data:
+#         updated_product_name = data["name"]
+#         updated_product_name_sanitized = updated_product_name.strip().lower()
+
+#         for i, product in enumerate(products):
+#             if i != idx and product["name"].lower() == updated_product_name_sanitized:
+
+#                 return (
+#                     jsonify(
+#                         {"error": f"Customer {updated_product_name} already exists"}
+#                     ),
+#                     400,
+#                 )
+
+#     updated_product = {"name": data["name"].strip(), "price": float(data["price"])}
+
+#     products[idx].update(updated_product)
+#     save_products(products)
+
+#     logger.info(f"Update product: {products[idx]} at index: {idx}")
+#     return jsonify(products[idx])
 
 
 # Delete a product by index
