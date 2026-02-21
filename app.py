@@ -698,16 +698,7 @@ def save_products(products):
 # Get the product list
 @app.route("/api/products")
 @require_api_key_or_session
-# def get_products():
-#     """
-#     Opens the JSON product file and returns it as a python object
-
-#     """
-#     products = load_products()
-#     return jsonify(products)
-
-
-def db_get_products():
+def get_products():
     pool = get_db_pool()
 
     with pool.connection() as conn:
@@ -716,6 +707,7 @@ def db_get_products():
                 """
             SELECT id, name, price
             FROM products
+            WHERE active = true
             ORDER BY name      
             """
             )
