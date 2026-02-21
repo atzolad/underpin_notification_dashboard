@@ -195,88 +195,12 @@ def dashboard():
     return render_template("dashboard.html", user=session["user"])
 
 
-def load_customers():
-    """
-    Opens the JSON customer file from Google Cloud and returns the loaded JSON data
-
-    """
-    bucket = get_storage_client()
-    blob = bucket.blob(customer_file)
-    logger.info("Reading customers from: %s", BUCKET_NAME)
-
-    try:
-        # download_as_bytes() returns the content, which we decode to a string
-        customer_string = blob.download_as_bytes().decode("utf-8")
-
-        # 3. Load and return the JSON data
-        data = json.loads(customer_string)
-        return data
-
-    except Exception as e:
-        # Handle cases where the file doesn't exist or is empty
-        logger.error(f"Error reading {customer_file} from GCS: {e}")
-        return []  # Return empty list or handle the error
-
-
-def db_get_customers():
-    pool = get_db_pool()
-
-    with pool.connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
-            SELECT c.id, c.name, c.email, ARRAY_AGG (JSON_BUILD_OBJECT('id', p.id, 'name', p.name) ORDER BY p.name) AS products
-            FROM customers AS c
-            LEFT JOIN customer_products AS cp on c.id = cp.customer_id
-            LEFT JOIN products AS p on cp.product_id = p.id
-            WHERE c.active = true
-            GROUP BY c.name, c.id, c.email
-                """
-            )
-            customers = cur.fetchall()
-            return customers
-
-
-def save_customers(customers):
-    """
-    Takes the new customer list in JSON format as input. Opens the customer file in "write" mode and writes the new list to the file.
-
-    See example in example_json/customers/json
-
-    """
-
-    bucket = get_storage_client()
-    blob = bucket.blob(customer_file)
-
-    try:
-        # Encode the JSON data
-        customer_string = json.dumps(customers, indent=2)
-
-        blob.upload_from_string(customer_string, content_type="application/json")
-        logger.info(f"Saved file {customer_file} to GCS bucket:")
-
-    except Exception as e:
-        logger.error(f"Error writing {customer_file} to GCS bucket: {e}")
-
-
 # Get the customer list
 @app.route("/api/customers")
 @require_api_key_or_session
 def get_customers():
     customers = db_get_customers()
     return jsonify(customers)
-
-
-# def get_customers():
-#     """
-#     Uses the load_customers function to open the Customer JSON file and return the data as a python object.
-
-#     For the Dashboard- Displays the list of current customers on the customer page.
-
-
-#     """
-#     data = load_customers()
-#     return data
 
 
 # Add a new customer
@@ -303,18 +227,6 @@ def add_customer():
             jsonify({"error": f"Customer {customer_request["name"]} already exists"}),
             400,
         )
-
-    # customers = db_get_customers()
-
-    # new_customer_name = customer_request["name"]
-    # new_customer_name_sanitized = customer_request["name"].strip().lower()
-
-    # for customer in customers:
-    #     if customer["name"].lower() == new_customer_name_sanitized:
-    #         return (
-    #             jsonify({"error": f"Customer {new_customer_name} already exists"}),
-    #             400,
-    #         )
 
     new_customer = {
         "name": customer_request["name"].strip(),
@@ -354,84 +266,7 @@ def add_customer():
     return jsonify(new_customer), 201
 
 
-# def add_customer():
-#     """
-#     Post method. Takes a new customer in the Json format
-
-#     Loops through the names of the current customers and checks that the new customer doesn't already exist.
-
-#     Adds the new customer to the end of the customer list before saving the JSON customer file.
-#     """
-#     data = request.json
-
-#     if not data.get("name") or not data.get("email"):
-#         return jsonify({"error": "Name and email required"}), 400
-
-#     customers = load_customers()
-
-#     new_customer_name = data["name"]
-#     new_customer_name_sanitized = data["name"].strip().lower()
-
-#     for customer in customers:
-#         if customer["name"].lower() == new_customer_name_sanitized:
-#             return (
-#                 jsonify({"error": f"Customer {new_customer_name} already exists"}),
-#                 400,
-#             )
-
-#     new_customer = {
-#         "name": data["name"].strip(),
-#         "email": data["email"].strip(),
-#         "products": data.get("products", []),
-#     }
-
-#     customers.append(new_customer)
-#     save_customers(customers)
-
-#     logger.info(f"New customer added: {new_customer}")
-
-
-#     return jsonify(new_customer), 201
-
-
-def db_customer_name_exists(new_customer_name):
-    pool = get_db_pool()
-
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-            SELECT 1 from customers
-            WHERE LOWER(name)=%s
-            LIMIT 1
-                """,
-                (new_customer_name,),
-            )
-            return cur.fetchone() is not None
-
-
-def db_get_products_per_customer(customer_id):
-    pool = get_db_pool()
-
-    with pool.connection() as conn:
-        with conn.cursor(row_factory=scalar_row) as cur:
-            cur.execute(
-                """
-                SELECT p.id 
-                FROM products AS p
-                JOIN customer_products AS cp on p.id = cp.product_id
-                WHERE cp.customer_id = %s""",
-                (customer_id,),
-            )
-
-            products = cur.fetchall()
-            print(f"products: {products}")
-            str_products = [str(product) for product in products]
-            print(f"STRING PRODUCTS: {str_products}")
-            return str_products
-
-
-# Update a customer by index
+# Update a customer by id
 @app.route("/api/customers/<customer_id>", methods=["PATCH"])
 @require_api_key_or_session
 def update_customer(customer_id):
@@ -525,61 +360,7 @@ def update_customer(customer_id):
         return jsonify({"error:" "Error updating customer"}), 500
 
 
-# def update_customer(idx):
-#     """
-#     Put Method. Takes the index of the customer at the end of the url /<int:idx> and replaces the customer at that index with the payload in Json format:
-
-#     """
-
-#     data = request.json
-#     customers = load_customers()
-
-#     if idx < 0 or idx >= len(customers):
-#         return jsonify({"error": "Customer not found"}), 404
-
-#     if "name" in data:
-#         updated_customer_name = data["name"]
-#         updated_customer_name_sanitized = updated_customer_name.strip().lower()
-
-#         for i, customer in enumerate(customers):
-#             if i != idx and customer["name"].lower() == updated_customer_name_sanitized:
-
-#                 return (
-#                     jsonify(
-#                         {"error": f"Customer {updated_customer_name} already exists"}
-#                     ),
-#                     400,
-#                 )
-
-#         data["name"] = data["name"].strip()
-
-#     if "email" in data:
-#         data["email"] = data["email"].strip()
-
-#     customers[idx].update(data)
-#     save_customers(customers)
-
-#     logger.info(f"Updated customer: {data["name"]} at index {idx}")
-#     return jsonify(customers[idx]), 201
-
-
-def db_customer_already_exists(customer_id):
-    pool = get_db_pool()
-
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-            SELECT 1 from customers
-            WHERE id=%s
-            LIMIT 1
-                """,
-                (customer_id,),
-            )
-            return cur.fetchone() is not None
-
-
-# Delete a customer by index
+# Delete a customer by id
 @app.route("/api/customers/<customer_id>", methods=["DELETE"])
 @require_api_key_or_session
 def delete_customer(customer_id):
@@ -628,75 +409,6 @@ def delete_customer(customer_id):
         )
 
 
-# # Delete a customer by index
-# @app.route("/api/customers/<int:idx>", methods=["DELETE"])
-# @require_api_key_or_session
-# def delete_customer(idx):
-#     """
-#     Delete Method. Takes the index of the customer at the end of the url /<int:idx> and deletes that customer from the JSON file and saves it. Returns a 404 error if the customer is not found.
-
-#     """
-
-#     customers = load_customers()
-
-#     if idx < 0 or idx >= len(customers):
-#         return jsonify({"error": "Customer not found"}), 404
-
-#     customer_to_be_del = customers[idx]
-#     customers.pop(idx)
-#     save_customers(customers)
-
-#     logger.info(f"Deleted customer: {customer_to_be_del} at index: {idx}")
-#     return jsonify({"deleted": f"Customer {customer_to_be_del["name"]} deleted!"}), 200
-
-
-# Load the product list
-def load_products():
-    """
-    Opens the JSON product file and returns it as a python object
-
-    """
-
-    bucket = get_storage_client()
-    blob = bucket.blob(product_file)
-    logger.info("Reading products from: %s", BUCKET_NAME)
-
-    try:
-        # download_as_bytes() returns the content, which we decode to a string
-        products_string = blob.download_as_bytes().decode("utf-8")
-
-        # 3. Load and return the JSON data
-        data = json.loads(products_string)
-        return data
-
-    except Exception as e:
-        # Handle cases where the file doesn't exist or is empty
-        logger.error(f"Error reading {product_file} from GCS: {e}")
-        return []  # Return empty list or handle the error
-
-
-# Save the new product list
-def save_products(products):
-    """
-    Takes a JSON formatted list as input.
-
-    Saves new product list to a JSON file.
-    """
-    bucket = get_storage_client()
-    blob = bucket.blob(product_file)
-    logger.info(f"Reading products from: {BUCKET_NAME}")
-
-    try:
-        # Encode the JSON data
-        products_string = json.dumps(products, indent=2)
-
-        blob.upload_from_string(products_string, content_type="application/json")
-        logger.info(f"Saved file {product_file} to GCS bucket:")
-
-    except Exception as e:
-        logger.error(f"Error writing {product_file} to GCS bucket: {e}")
-
-
 # Get the product list
 @app.route("/api/products")
 @require_api_key_or_session
@@ -715,38 +427,6 @@ def get_products():
             )
             products = cur.fetchall()
         return jsonify(products)
-
-
-def db_product_exists(product_id):
-    pool = get_db_pool()
-
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-            SELECT 1 from products
-            WHERE id=%s
-            LIMIT 1
-            """,
-                (product_id,),
-            )
-            return cur.fetchone() is not None
-
-
-def db_product_name_exists(product_name):
-    pool = get_db_pool()
-
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-            SELECT 1 from products
-            WHERE LOWER(name)=%s
-            LIMIT 1
-            """,
-                (product_name,),
-            )
-            return cur.fetchone() is not None
 
 
 # Add a new product
@@ -796,38 +476,7 @@ def add_product():
         return jsonify({"error": "Error adding product to database"}), 500
 
 
-# def add_product():
-#     """
-#     POST method. Accepts a body of:
-
-
-#      {
-#     "name": "Newname",
-#     "price": "99.99")
-#     }
-
-#     If the product name does not already exist- it adds the new product to the product list JSON file and saves it. Returns a 400 error if the product already exists, otherwise returns the info for the new product in JSON format.
-
-#     """
-#     data = request.json
-#     products = load_products()
-#     new_product_name = data["name"]
-#     new_product_name_sanitized = new_product_name.strip().lower()
-
-#     for product in products:
-#         if product["name"].lower() == new_product_name_sanitized:
-#             return jsonify({"error": f"Product {new_product_name} already exists"}), 400
-
-#     new_product = {"name": data["name"].strip(), "price": float(data["price"])}
-
-#     products.append(new_product)
-#     save_products(products)
-
-#     logger.info(f"Added Product: {new_product["name"]}")
-#     return jsonify(new_product), 201
-
-
-# Update a product by index
+# Update a product by id
 @app.route("/api/products/<product_id>", methods=["PATCH"])
 @require_api_key_or_session
 def update_product(product_id):
@@ -893,47 +542,7 @@ def update_product(product_id):
         return jsonify({"error": "Error updating product"}), 500
 
 
-# def update_product(idx):
-#     """
-#     PUT Method. Takes the index of the product at the end of the url /<int:idx> and replaces the product at that index with the payload in Json format. Returns a 404 error if the product isn't found.
-
-
-#     {
-#         "name": "NewProduct",
-#         "price": "99.99",
-#     }
-
-#     """
-#     data = request.json
-#     products = load_products()
-
-#     if idx < 0 or idx >= len(products):
-#         return jsonify({"error": "Product not found"}), 404
-
-#     if "name" in data:
-#         updated_product_name = data["name"]
-#         updated_product_name_sanitized = updated_product_name.strip().lower()
-
-#         for i, product in enumerate(products):
-#             if i != idx and product["name"].lower() == updated_product_name_sanitized:
-
-#                 return (
-#                     jsonify(
-#                         {"error": f"Customer {updated_product_name} already exists"}
-#                     ),
-#                     400,
-#                 )
-
-#     updated_product = {"name": data["name"].strip(), "price": float(data["price"])}
-
-#     products[idx].update(updated_product)
-#     save_products(products)
-
-#     logger.info(f"Update product: {products[idx]} at index: {idx}")
-#     return jsonify(products[idx])
-
-
-# Delete a product by index
+# Delete a product by id
 @app.route("/api/products/<product_id>", methods=["DELETE"])
 @require_api_key_or_session
 def delete_product(product_id):
@@ -976,27 +585,6 @@ def delete_product(product_id):
     except Exception as e:
         logger.error(f"Error deleting product with id {product_id}: {e}")
         return (jsonify({"error": "Error deleting product"}), 500)
-
-
-# def delete_product(idx):
-#     """
-#     DELETE method. Takes the index of the product at the end of the url /<int:idx> and deletes that product from the product list. Returns a 404 error if the product isn't found.
-
-#     Args: <int:idx>
-
-#     """
-
-#     products = load_products()
-
-#     if idx < 0 or idx > len(products):
-#         return jsonify({"error": "Product not found"}), 404
-
-#     product_to_be_del = products[idx]
-#     deleted_prod = products.pop(idx)
-#     save_products(products)
-
-#     logger.info(f"delete product: {deleted_prod} at index: {idx}")
-#     return jsonify({"deleted": f"Product {product_to_be_del["name"]} deleted!"}), 200
 
 
 def load_email_template():
@@ -1104,6 +692,208 @@ def close_db_pool():
     if pool:
         print("Closing Global Connection Pool")
         pool.close()
+
+
+# Customer helper functions
+
+
+def load_customers():
+    """
+    Opens the JSON customer file from Google Cloud and returns the loaded JSON data
+
+    """
+    bucket = get_storage_client()
+    blob = bucket.blob(customer_file)
+    logger.info("Reading customers from: %s", BUCKET_NAME)
+
+    try:
+        # download_as_bytes() returns the content, which we decode to a string
+        customer_string = blob.download_as_bytes().decode("utf-8")
+
+        # 3. Load and return the JSON data
+        data = json.loads(customer_string)
+        return data
+
+    except Exception as e:
+        # Handle cases where the file doesn't exist or is empty
+        logger.error(f"Error reading {customer_file} from GCS: {e}")
+        return []  # Return empty list or handle the error
+
+
+def db_get_customers():
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+            SELECT c.id, c.name, c.email, ARRAY_AGG (JSON_BUILD_OBJECT('id', p.id, 'name', p.name) ORDER BY p.name) AS products
+            FROM customers AS c
+            LEFT JOIN customer_products AS cp on c.id = cp.customer_id
+            LEFT JOIN products AS p on cp.product_id = p.id
+            WHERE c.active = true
+            GROUP BY c.name, c.id, c.email
+                """
+            )
+            customers = cur.fetchall()
+            return customers
+
+
+def save_customers(customers):
+    """
+    Takes the new customer list in JSON format as input. Opens the customer file in "write" mode and writes the new list to the file.
+
+    See example in example_json/customers/json
+
+    """
+
+    bucket = get_storage_client()
+    blob = bucket.blob(customer_file)
+
+    try:
+        # Encode the JSON data
+        customer_string = json.dumps(customers, indent=2)
+
+        blob.upload_from_string(customer_string, content_type="application/json")
+        logger.info(f"Saved file {customer_file} to GCS bucket:")
+
+    except Exception as e:
+        logger.error(f"Error writing {customer_file} to GCS bucket: {e}")
+
+
+def db_customer_name_exists(new_customer_name):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from customers
+            WHERE LOWER(name)=%s
+            LIMIT 1
+                """,
+                (new_customer_name,),
+            )
+            return cur.fetchone() is not None
+
+
+def db_get_products_per_customer(customer_id):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=scalar_row) as cur:
+            cur.execute(
+                """
+                SELECT p.id 
+                FROM products AS p
+                JOIN customer_products AS cp on p.id = cp.product_id
+                WHERE cp.customer_id = %s""",
+                (customer_id,),
+            )
+
+            products = cur.fetchall()
+            print(f"products: {products}")
+            str_products = [str(product) for product in products]
+            print(f"STRING PRODUCTS: {str_products}")
+            return str_products
+
+
+def db_customer_already_exists(customer_id):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from customers
+            WHERE id=%s
+            LIMIT 1
+                """,
+                (customer_id,),
+            )
+            return cur.fetchone() is not None
+
+
+# Product helper functions
+
+
+# Load the product list
+def load_products():
+    """
+    Opens the JSON product file and returns it as a python object
+
+    """
+
+    bucket = get_storage_client()
+    blob = bucket.blob(product_file)
+    logger.info("Reading products from: %s", BUCKET_NAME)
+
+    try:
+        # download_as_bytes() returns the content, which we decode to a string
+        products_string = blob.download_as_bytes().decode("utf-8")
+
+        # 3. Load and return the JSON data
+        data = json.loads(products_string)
+        return data
+
+    except Exception as e:
+        # Handle cases where the file doesn't exist or is empty
+        logger.error(f"Error reading {product_file} from GCS: {e}")
+        return []  # Return empty list or handle the error
+
+
+# Save the new product list
+def save_products(products):
+    """
+    Takes a JSON formatted list as input.
+
+    Saves new product list to a JSON file.
+    """
+    bucket = get_storage_client()
+    blob = bucket.blob(product_file)
+    logger.info(f"Reading products from: {BUCKET_NAME}")
+
+    try:
+        # Encode the JSON data
+        products_string = json.dumps(products, indent=2)
+
+        blob.upload_from_string(products_string, content_type="application/json")
+        logger.info(f"Saved file {product_file} to GCS bucket:")
+
+    except Exception as e:
+        logger.error(f"Error writing {product_file} to GCS bucket: {e}")
+
+
+def db_product_exists(product_id):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from products
+            WHERE id=%s
+            LIMIT 1
+            """,
+                (product_id,),
+            )
+            return cur.fetchone() is not None
+
+
+def db_product_name_exists(product_name):
+    pool = get_db_pool()
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+            SELECT 1 from products
+            WHERE LOWER(name)=%s
+            LIMIT 1
+            """,
+                (product_name,),
+            )
+            return cur.fetchone() is not None
 
 
 if __name__ == "__main__":
