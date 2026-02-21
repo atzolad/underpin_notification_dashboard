@@ -934,27 +934,69 @@ def update_product(product_id):
 
 
 # Delete a product by index
-@app.route("/api/products/<int:idx>", methods=["DELETE"])
+@app.route("/api/products/<product_id>", methods=["DELETE"])
 @require_api_key_or_session
-def delete_product(idx):
+def delete_product(product_id):
     """
-    DELETE method. Takes the index of the product at the end of the url /<int:idx> and deletes that product from the product list. Returns a 404 error if the product isn't found.
+    DELETE method. Takes the index of the product at the end of the url /<product_ic> and deletes that product from the product table. Returns a 404 error if the product isn't found.
 
     Args: <int:idx>
 
     """
 
-    products = load_products()
+    try:
+        if not db_product_exists(product_id):
+            logger.warning(f"Product with id {product_id} not found in db")
+            return jsonify({"error": "Product not found"}), 404
 
-    if idx < 0 or idx > len(products):
-        return jsonify({"error": "Product not found"}), 404
+        pool = get_db_pool()
 
-    product_to_be_del = products[idx]
-    deleted_prod = products.pop(idx)
-    save_products(products)
+        with pool.connection() as conn:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                    UPDATE products
+                    SET active = false
+                    WHERE id = %s""",
+                        (product_id,),
+                    )
 
-    logger.info(f"delete product: {deleted_prod} at index: {idx}")
-    return jsonify({"deleted": f"Product {product_to_be_del["name"]} deleted!"}), 200
+                    cur.execute(
+                        """
+                    DELETE FROM customer_products
+                    WHERE product_id = %s
+                    """,
+                        (product_id,),
+                    )
+
+        logger.info(f"Deleted product with id {product_id}")
+        return (jsonify({"deleted": f"Product Deleted!"}), 200)
+
+    except Exception as e:
+        logger.error(f"Error deleting product with id {product_id}: {e}")
+        return (jsonify({"error": "Error deleting product"}), 500)
+
+
+# def delete_product(idx):
+#     """
+#     DELETE method. Takes the index of the product at the end of the url /<int:idx> and deletes that product from the product list. Returns a 404 error if the product isn't found.
+
+#     Args: <int:idx>
+
+#     """
+
+#     products = load_products()
+
+#     if idx < 0 or idx > len(products):
+#         return jsonify({"error": "Product not found"}), 404
+
+#     product_to_be_del = products[idx]
+#     deleted_prod = products.pop(idx)
+#     save_products(products)
+
+#     logger.info(f"delete product: {deleted_prod} at index: {idx}")
+#     return jsonify({"deleted": f"Product {product_to_be_del["name"]} deleted!"}), 200
 
 
 def load_email_template():
