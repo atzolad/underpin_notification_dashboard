@@ -597,9 +597,9 @@
             }
         }
 
-        async function deleteCustomer(idx) {
+        async function deleteCustomer(id) {
             if (confirm('Are you sure you want to delete this customer?')) {
-                const resp = await fetch(`/api/customers/${idx}`, { method: 'DELETE' });
+                const resp = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
 
                 const responseData = await resp.json();
 
