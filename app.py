@@ -36,6 +36,10 @@ app = Flask(__name__)
 
 # Retrieve environmental variables
 app.secret_key = os.environ.get("SECRET_KEY")
+if not app.secret_key:
+    logger.error("SECRET_KEY is not set. Sessions will not be secure.")
+    raise EnvironmentError("Missing Secret_KEY environmental variable.")
+
 CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 API_KEY = os.environ.get("API_KEY")
@@ -100,7 +104,8 @@ def get_storage_client():
 
 @app.teardown_appcontext
 def teardown_storage_client(exception=None):
-    storage_client = g.pop("storage_client", None)
+    g.pop("storage_client", None)
+    g.pop("storage_bucket", None)
 
 
 oauth = OAuth(app)
@@ -168,6 +173,17 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+@app.after_request
+def set_cache_headers(response):
+    if "text/html" in response.content_type:
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0"
+        )
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 
 # Require API key for endpoints or just use the Session cookie for a logged in user.
@@ -397,7 +413,7 @@ def delete_customer(customer_id):
 
         logger.info(f"Deleted customer with id {customer_id}")
         return (
-            jsonify({"deleted": f"Customer deleted!"}),
+            jsonify({"deleted": "Customer deleted!"}),
             200,
         )
 
@@ -445,8 +461,17 @@ def add_product():
 
     """
     try:
+
         new_product_request = request.json
-        new_product_name = new_product_request["name"]
+
+        if (
+            not new_product_request
+            or not new_product_request.get("name")
+            or new_product_request.get("price") is None
+        ):
+            return jsonify({"error": "Name and price are required"}), 400
+
+        new_product_name = new_product_request.get("name")
         new_product_name_sanitized = new_product_name.strip().lower()
 
         if db_product_name_exists(new_product_name_sanitized):
@@ -468,7 +493,7 @@ def add_product():
                     (new_product["name"], new_product["price"]),
                 )
 
-        logger.info(f"Added Product: {new_product["name"]}")
+        logger.info(f"Added Product: {new_product['name']}")
         return jsonify(new_product), 201
 
     except Exception as e:
@@ -682,6 +707,25 @@ def update_email_template():
     """
 
     updated_email_template = request.json
+
+    required_keys = {
+        "subject",
+        "greeting",
+        "header",
+        "sign_off",
+        "signature",
+        "total_revenue",
+    }
+    if not updated_email_template or not required_keys.issubset(
+        updated_email_template.keys()
+    ):
+        missing = (
+            required_keys - set(updated_email_template.keys())
+            if updated_email_template
+            else required_keys
+        )
+        return jsonify({"error": f"Missing required template fields: {missing}"}), 400
+
     save_email_template(updated_email_template)
 
     logger.info(f"New email template: {updated_email_template}")
@@ -835,7 +879,7 @@ def load_products():
         # download_as_bytes() returns the content, which we decode to a string
         products_string = blob.download_as_bytes().decode("utf-8")
 
-        # 3. Load and return the JSON data
+        # Load and return the JSON data
         data = json.loads(products_string)
         return data
 
