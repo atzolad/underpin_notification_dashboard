@@ -605,13 +605,19 @@
 
         async function deleteCustomer(id) {
             if (confirm('Are you sure you want to delete this customer?')) {
-                const resp = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+                try {
+                    const resp = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+                    const responseData = await resp.json();
 
-                const responseData = await resp.json();
-
-                if (resp.ok) {
-                    loadCustomers();
-                    showAlert('customerAlert', responseData.deleted, 'success');
+                    if (resp.ok) {
+                        loadCustomers();
+                        showAlert('customerAlert', responseData.deleted, 'success');
+                    } else {
+                        showAlert('customerAlert', responseData.error || 'Error deleting customer', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showAlert('customerAlert', 'Network error occurred', 'danger');
                 }
             }
         }
