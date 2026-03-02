@@ -503,6 +503,7 @@
                     document.getElementById('customerForm').reset();
                     loadCustomers();
                 } else {
+                    loadCustomers();
                     // Show the specific error message from backend
                     showAlert('customerAlert', responseData.error || 'Error adding customer', 'danger');
                 }
@@ -550,6 +551,7 @@
                     loadCustomers();
                     showAlert('customerAlert', 'Customer updated!', 'success');
                 } else {
+                    loadCustomers();
                     // Show the specific error message from backend
                     showAlert('customerAlert', responseData.error || 'Error adding customer', 'danger');
                 }
@@ -569,6 +571,10 @@
                 if (resp.ok) {
                     loadCustomers();
                     showAlert('customerAlert', responseData.deleted, 'success');
+                } else {
+                    loadCustomers();
+                    // Show the specific error message from backend
+                    showAlert('customerAlert', responseData.error || 'Error deleting customer', 'danger');
                 }
             }
         }
@@ -623,6 +629,7 @@
                     loadProducts();
                 } else {
                     // Show the specific error message from backend
+                    loadProducts();
                     showAlert('productAlert', responseData.error || 'Error adding product', 'danger');
                 }
 
@@ -662,6 +669,7 @@
                     loadProducts();
                     showAlert('productAlert', 'Product updated!', 'success');
                 } else {
+                    loadProducts();
                     // Show the specific error message from backend
                     showAlert('productAlert', responseData.error || 'Error adding product', 'danger');
                 }
@@ -681,6 +689,10 @@
                 if (resp.ok) {
                     loadProducts();
                     showAlert('productAlert', responseData.deleted, 'success');
+                } else {
+                    loadProducts();
+                    // Show the specific error message from backend
+                    showAlert('productAlert', responseData.error || 'Error deleting product', 'danger');
                 }
             }
         }
@@ -736,6 +748,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>`;
         }
+
     </script>
 </body>
 

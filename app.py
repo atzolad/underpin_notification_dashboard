@@ -150,6 +150,17 @@ def require_api_key_or_session(f):
     return decorated_function
 
 
+@app.after_request
+def set_cache_headers(response):
+    if "text/html" in response.content_type:
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0"
+        )
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 # Render the main dashboard
 @app.route("/")
 @login_required
@@ -337,7 +348,7 @@ def load_products():
         # download_as_bytes() returns the content, which we decode to a string
         products_string = blob.download_as_bytes().decode("utf-8")
 
-        # 3. Load and return the JSON data
+        # Load and return the JSON data
         data = json.loads(products_string)
         return data
 
@@ -356,7 +367,7 @@ def save_products(products):
     """
     bucket = get_storage_client()
     blob = bucket.blob(product_file)
-    logger.info(f"Reading products from: {BUCKET_NAME}")
+    logger.info(f"Savings products to: {BUCKET_NAME}")
 
     try:
         # Encode the JSON data
@@ -404,6 +415,9 @@ def add_product():
 
     for product in products:
         if product["name"].lower() == new_product_name_sanitized:
+            logger.warning(
+                f"Error adding product. Product {new_product_name} already exists"
+            )
             return jsonify({"error": f"Product {new_product_name} already exists"}), 400
 
     new_product = {"name": data["name"].strip(), "price": float(data["price"])}
