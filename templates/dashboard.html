@@ -635,7 +635,7 @@
             tbody.innerHTML = products.map((p) => `
                 <tr>
                     <td><strong>${escapeHtml(p.name)}</strong></td>
-                    <td>$${escapeHtml(p.price.toFixed(2))}</td>
+                    <td>$${escapeHtml(p.price)}</td>
                     <td>
                         <div class="btn-group-actions">
                             <button class="btn btn-sm btn-primary" onclick="editProduct('${p.id}')">
@@ -747,13 +747,20 @@
 
         async function deleteProduct(id) {
             if (confirm('Are you sure you want to delete this product?')) {
-                const resp = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                try {
+                    const resp = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                    const responseData = await resp.json();
 
-                const responseData = await resp.json();
-
-                if (resp.ok) {
-                    loadProducts();
-                    showAlert('productAlert', responseData.deleted, 'success');
+                    if (resp.ok) {
+                        loadProducts();
+                        showAlert('productAlert', responseData.deleted, 'success');
+                    } else {
+                        loadProducts();
+                        showAlert('productAlert', responseData.error || 'Error deleting product', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showAlert('productAlert', 'Network error occurred', 'danger');
                 }
             }
         }
@@ -797,7 +804,7 @@
 
         // Utility
         function populateProductSelects() {
-            const options = products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            const options = products.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
             document.getElementById('customerProducts').innerHTML = options;
             document.getElementById('editCustomerProducts').innerHTML = options;
         }
