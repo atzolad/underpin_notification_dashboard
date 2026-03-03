@@ -634,8 +634,8 @@
             const tbody = document.getElementById('productTableBody');
             tbody.innerHTML = products.map((p) => `
                 <tr>
-                    <td><strong>${p.name}</strong></td>
-                    <td>$${p.price}</td>
+                    <td><strong>${escapeHtml(p.name)}</strong></td>
+                    <td>$${escapeHtml(p.price.toFixed(2))}</td>
                     <td>
                         <div class="btn-group-actions">
                             <button class="btn btn-sm btn-primary" onclick="editProduct('${p.id}')">
@@ -676,7 +676,7 @@
                 }
 
             } catch (error) {
-                console.error('Error:, error');
+                console.error('Error:', error);
                 showAlert('productAlert', 'Network error occurred', 'danger');
             }
         }
@@ -740,7 +740,7 @@
                 }
 
             } catch (error) {
-                console.error('Error:, error');
+                console.error('Error:', error);
                 showAlert('productAlert', 'Network error occurred', 'danger');
             }
         }
